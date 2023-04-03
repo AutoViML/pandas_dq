@@ -246,12 +246,12 @@ def left_subtract(l1,l2):
 
 # Define a custom transformer class for fixing data quality issues
 class Fix_DQ(BaseEstimator, TransformerMixin):
-    # Initialize the class with optional parameters for the quantile, cat_value and num_value
+    # Initialize the class with optional parameters for the quantile, cat_fill_value and num_fill_value
     def __init__(self, quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
                  rare_threshold=0.05, correlation_threshold=0.8):
         self.quantile = quantile # Define a threshold for IQR for outlier detection 
-        self.cat_value = cat_fill_value ## Define a fill value for missing categories
-        self.num_value = num_fill_value # Define a fill value for missing numbers
+        self.cat_fill_value = cat_fill_value ## Define a fill value for missing categories
+        self.num_fill_value = num_fill_value # Define a fill value for missing numbers
         self.rare_threshold = rare_threshold # Define a threshold for rare categories
         self.correlation_threshold = correlation_threshold ## Above this limit, variables will be dropped
     
@@ -292,11 +292,11 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         
-        # Impute the missing values in categorical columns with the cat_value
-        X[cat_cols] = X[cat_cols].fillna(self.cat_value)
+        # Impute the missing values in categorical columns with the cat_fill_value
+        X[cat_cols] = X[cat_cols].fillna(self.cat_fill_value)
         
-        # Impute the missing values in numerical columns with the num_value
-        X[num_cols] = X[num_cols].fillna(self.num_value)
+        # Impute the missing values in numerical columns with the num_fill_value
+        X[num_cols] = X[num_cols].fillna(self.num_fill_value)
         
         # Return the DataFrame with imputed missing values
         return X
@@ -519,7 +519,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.00'
+version_number =  '1.1'
 print(f"""{module_type} pandas_dq ({version_number}). Use fit and transform using:
 from pandas_dq import find_dq, Fix_DQ
 fdq = Fix_DQ(quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 

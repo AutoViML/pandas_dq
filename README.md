@@ -62,7 +62,7 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 <ol>
 <li><b>pandas_dq is built using pandas, numpy and scikit-learn - that's all.</b> It should run on almost all Python3 Anaconda installations without additional installs. You won't have to import any special libraries.</li>
 </ol>
-The best method to install lazytransform is to use conda:<p>
+The best method to install pandas_dq is to use pip:<p>
 
 ```
 pip install pandas_dq 
