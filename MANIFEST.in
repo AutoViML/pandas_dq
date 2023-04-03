@@ -1,0 +1,28 @@
+include README.md
+
+include LICENSE
+include LICENSE.txt
+
+include MANIFEST.in
+include setup.py
+include setup.cfg
+
+include requirements.txt
+recursive-include requirements *.txt
+
+include Featurewiz_LazyTransform_Demo1.ipynb
+include Featurewiz_LazyTransform_Demo2.ipynb
+include LazyTransformer_with_GridSearch_Pipeline.ipynb
+include lazy_code1.png
+include lazy_code2.png
+include lazy_feat_imp.png
+include lazy_gridsearch.png
+include lazy_logo5.png
+include lazy_pipe.png
+include lazytransform.py
+include lazytransformer_kaggle_demo.ipynb
+
+recursive-exclude notebooks *
+recursive-exclude images *
+
+exclude .gitignore
