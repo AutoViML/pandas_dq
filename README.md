@@ -126,11 +126,11 @@ Once you import it, you can define the object by giving several options such as:
   - `1` more verbiage. Great for knowing details behind each issue and what the suggestions are.
 
 `Fix_DQ` has slightly more arguments:
-- `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1.
-  - `cat_fill_value`: string ("missing"): Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
-  - `num_fill_value`: integer or float (999): Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
-  - `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less 5% (say) of samples, then it will considered rare. All rare categories will be merged with a category value called "Rare". 
-  - `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, the variable will be dropped. 
+- `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.
+- `cat_fill_value`: string ("missing"): Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
+- `num_fill_value`: integer or float (999): Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
+- `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less 5% (say) of samples, then it will considered rare. All rare categories will be merged with a category value called "Rare". 
+- `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, the variable will be dropped. 
 <p>
 
 ## Maintainers

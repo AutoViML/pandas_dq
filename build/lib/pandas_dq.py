@@ -424,19 +424,15 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         self.upper_bounds_ = {}
         
         # Loop through each numerical column
-        if self.quantile is None:
-            #### Don't do any processing is quantile is set to None ###
-            pass
-        else:
-            for col in num_cols:
-                # Get the third quartile
-                q3 = X[col].quantile(self.quantile)
-                # Get the interquartile range
-                iqr = X[col].quantile(self.quantile) - X[col].quantile(1 - self.quantile)
-                # Calculate the upper bound
-                upper_bound = q3 + 1.5 * iqr
-                # Store the upper bound in the dictionary
-                self.upper_bounds_[col] = upper_bound
+        for col in num_cols:
+            # Get the third quartile
+            q3 = X[col].quantile(self.quantile)
+            # Get the interquartile range
+            iqr = X[col].quantile(self.quantile) - X[col].quantile(1 - self.quantile)
+            # Calculate the upper bound
+            upper_bound = q3 + 1.5 * iqr
+            # Store the upper bound in the dictionary
+            self.upper_bounds_[col] = upper_bound
 
         # Initialize an empty dictionary to store the column transformers
         self.col_transformers_ = {}
@@ -523,7 +519,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.2'
+version_number =  '1.1'
 print(f"""{module_type} pandas_dq ({version_number}). Use fit and transform using:
 from pandas_dq import find_dq, Fix_DQ
 fdq = Fix_DQ(quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
