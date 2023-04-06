@@ -40,22 +40,91 @@
 # Define a function to print data cleaning suggestions
 # Import pandas and numpy libraries
 import pandas as pd
+import polars as pl
+import pyarrow as pa
 import numpy as np
 import copy
+import os
 # Define a function to print data cleaning suggestions
-def find_dq(df, target=None, verbose=0):
+def find_dq(data, target=None, csv_engine="pandas", verbose=0):
+    """
+    This is a data quality check tool that accepts any kind of file format as a filename or as a pandas dataframe. 
+    It highlights potential data quality issues in the data. 
+    The function detects missing values and suggests to impute them with mean, median,
+      mode, or a constant value. It also identifies rare categories and suggests to group them
+       into a single category or to drop them. 
+       The function finds infinite values and suggests to replace them with NaN or a
+        large value. It detects mixed data types and suggests to convert them 
+        to a single type or split them into multiple columns.
+         The function detects duplicate rows and columns, outliers in numeric columns,
+          high cardinality features only in categorical columns, and 
+          highly correlated features. 
+    Finally, the function identifies if the problem is a classification problem or
+     a regression problem and checks if there is class imbalanced or target leakage in the dataset.
+    """
     if not verbose:
-        print("Set verbose to 1 to see more details on each of these data quality issues.")
+        print("Currently verbose set to 0. Change verbose to 1 to see more details on each DQ issue.")
+    # Check if the input is a string or a dataframe
+    if isinstance(data, str):
+        # Get the file extension
+        ext = os.path.splitext(data)[-1]
+        # Load the file into a pandas dataframe based on the extension
+        if ext == ".csv":
+            if csv_engine == 'pandas':
+                # Upload the data file into Pandas
+                df = pd.read_csv(data, nrows=1000000)
+            elif csv_engine == 'polars':
+                # Upload the data file into Polars
+                df_polars = pl.read_csv(data, nrows=1000000)
+            elif csv_engine == 'parquet':
+                # Upload the data file into Parquet
+                df_parquet = pa.read_table(data)
+        elif ext == ".parquet":
+            df = pd.read_parquet(data)
+        elif ext in [".feather", ".arrow"]:
+            df = pd.read_feather(data)
+        else:
+            print("Unsupported file format. Please use CSV, parquet, feather or arrow.")
+            return
+    elif isinstance(data, pd.DataFrame):
+        # Use the input dataframe as is
+        df = data
+    else:
+        print("Invalid input. Please provide a string (filename) or a dataframe.")
+        return
+
+    ### This is the column that lists our data quality issues
+    new_col = 'DQ Issue'
+    good_col = "The Good News"
+    bad_col = "The Bad News"
+
+    # Create an empty dataframe to store the data quality issues
+    dq_df1 = pd.DataFrame(columns=["Column", "first_comma", new_col])
+    dq_df1 = dq_df1.append({"Column": good_col, "first_comma":"", new_col: f""}, ignore_index=True)
+    dq_df1 = dq_df1.append({"Column": bad_col, "first_comma":"", new_col: f""}, ignore_index=True)
+
+    # Create an empty dataframe to store the data quality issues
+    dq_df2 = pd.DataFrame(columns=["Column", "first_comma", new_col])
+    for col in list(df):
+        dq_df2 = dq_df2.append({"Column": col, "first_comma":"", new_col: f""}, ignore_index=True)
+    
     # Detect missing values and suggests to impute them with mean, median, mode, or a constant value123
     missing_values = df.isnull().sum()
     missing_cols = missing_values[missing_values > 0].index.tolist()
     if len(missing_cols) > 0:
-        print(f"There are {len(missing_cols)} columns with missing values in the dataset. You may want to impute them with mean, median, mode, or a constant value such as 123.")
-        if verbose:
-            for col in missing_cols:
-                print(f"{col} has {missing_values[col]} missing values.")
+        for col in missing_cols:
+            # Append a row to the dq_df1 with the column name and the issue only if the column has a missing value
+            if missing_values[col] > 0:
+                mask0 = dq_df2['Column'] == col
+                new_string = f"{missing_values[col]} missing values. You may want to impute them with mean, median, mode, or a constant value such as 123."
+                dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+                dq_df2.loc[mask0,'first_comma'] = ', '
     else:
-        print("There are no columns with missing values in the dataset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string = f"There are no columns with missing values in the dataset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
+    
 
     # Identify rare categories and suggests to group them into a single category or drop them123
     rare_threshold = 0.05 # Define a threshold for rare categories
@@ -67,53 +136,89 @@ def find_dq(df, target=None, verbose=0):
             rare_values = value_counts[value_counts < rare_threshold].index.tolist()
             if len(rare_values) > 0:
                 rare_cat_cols.append(col)
-        if len(rare_cat_cols) > 0:
-            print(f"There are {len(cat_cols)} categorical columns with rare categories in the dataset. You may want to group rare categories into a single category or drop the categories.")
-            for rare_col in rare_cat_cols:
-                if verbose:
-                    print(f"{col} has {len(rare_values)} rare categories: {rare_values}")
+                # Append a row to the dq_df2 with the column name and the issue
+                mask0 = dq_df2['Column'] == col
+                new_string = f"{len(rare_values)} rare categories: {rare_values}. You may want to group them into a single category or drop the categories."
+                dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+                dq_df2.loc[mask0,'first_comma'] = ', '
     else:
-        print(f"There are no categorical columns with rare categories (< {100*rare_threshold:.0f} percent) in this dataset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no categorical columns with rare categories (< {100*rare_threshold:.0f} percent) in this dataset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
+
 
     # Find infinite values and suggests to replace them with NaN or a large value123
     inf_values = df.replace([np.inf, -np.inf], np.nan).isnull().sum() - missing_values
     inf_cols = inf_values[inf_values > 0].index.tolist()
     if len(inf_cols) > 0:
-        print(f"There are {len(inf_cols)} columns with infinite values in the dataset. You may want to replace them with NaN or a large value.")
-        if verbose:
-            for col in inf_cols:
-                print(f"{col} has {inf_values[col]} infinite values.")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string =  f"There are {len(inf_cols)} columns with infinite values in the dataset. You may want to replace them with NaN or a large value."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
+        for col in inf_cols:
+            if inf_values[col] > 0:
+                mask0 = dq_df2['Column'] == col
+                new_string = f"{inf_values[col]} infinite values. You may want to cap them with a maximum."
+                dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+                dq_df2.loc[mask0,'first_comma'] = ', '
     else:
-        print("There are no numeric columns with infinite values in this dataset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no columns with infinite values in this dataset "
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
 
     # Detect mixed data types and suggests to convert them to a single type or split them into multiple columns123
     mixed_types = df.applymap(type).nunique() # Get the number of unique types in each column
     mixed_cols = mixed_types[mixed_types > 1].index.tolist() # Get the columns with more than one type
     if len(mixed_cols) > 0:
-        print(f"There are {len(mixed_cols)} columns with mixed data types in the dataset. You may want to convert them to a single type or split them into multiple columns.")
-        if verbose:
-            for col in mixed_cols:
-                if verbose:
-                    print(f"{col} has {mixed_types[col]} different types: {df[col].apply(type).unique()}")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string = f"There are {len(mixed_cols)} columns with mixed data types in the dataset. You may want to convert them to a single type or split them into multiple columns."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
+        for col in mixed_cols:
+            if mixed_types[col] > 1:
+                mask0 = dq_df2['Column'] == col
+                new_string = f"Mixed dtypes: has {mixed_types[col]} different data types: "
+                for each_class in df[col].apply(type).unique():
+                    if each_class == str:
+                        new_string +=  f" object,"
+                    elif each_class == int:
+                        new_string +=  f" integer,"
+                    elif each_class == float:
+                        new_string +=  f" float,"
+                dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+                dq_df2.loc[mask0,'first_comma'] = ', '
     else:
-        print("There are no columns with mixed (more than one) dataypes in this dataset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no columns with mixed (more than one) dataypes in this dataset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
 
                 
     # Detect duplicate rows and columns
     dup_rows = df.duplicated().sum()
     dup_cols = df.T.duplicated().sum()
     if dup_rows > 0:
-        print(f"There are {len(dup_rows)} duplicate rows in the dataset. You may want to drop them or keep only one copy.")
-        if verbose:
-            print(f"    Duplicate rows: {dup_rows}")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string =  f"There are {len(dup_rows)} duplicate columns in the dataset. You may want to keep only one copy of {dup_rows}."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
     else:
-        print("There are no duplicate rows in this dataset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no duplicate rows in this dataset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
     if dup_cols > 0:
-        print(f"There are {len(dup_cols)} duplicate columns in the dataset. You may want to drop them or keep only one copy.")
-        if verbose:
-            print(f"    Duplicate columns: {dup_cols}")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string =  f"There are {len(dup_cols)} duplicate columns in the dataset. You may want to keep only one copy of {dup_cols}."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
     else:
-        print("There are no duplicate columns in this datatset")
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no duplicate columns in this datatset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
 
     # Detect outliers in numeric cols
     num_cols = df.select_dtypes(include=["int", "float"]).columns.tolist() # Get numerical columns
@@ -130,27 +235,41 @@ def find_dq(df, target=None, verbose=0):
             if len(outliers) > 0:
                 outlier_cols.append(col)
                 if first_time:
-                    print(f"There are {len(num_cols)} numerical columns, some with outliers. Remove them or use robust statistics.")
+                    mask0 = dq_df1['Column'] == bad_col
+                    new_string = f"There are {len(num_cols)} numerical columns, some with outliers. Remove them or use robust statistics."
+                    dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+                    dq_df1.loc[mask0,'first_comma'] = ', '
                     first_time =False
                 ### check if there are outlier columns and print them ##
-                if verbose:
-                    print(f"    {col} has {len(outliers)} outliers.")
-                    print(f"        Here are the values: {outliers.values}")
+                mask0 = dq_df2['Column'] == col
+                new_string = f"has {len(outliers)} outliers starting at value: {min(outliers.values)}"
+                dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+                dq_df2.loc[mask0,'first_comma'] = ', '
         if len(outlier_cols) < 1:
-            print("There are no numeric columns with outliers in this dataset")
-        else:
-            if not first_time and not verbose:
-                print(f"    {len(outlier_cols)} columns with outliers.")
+            mask0 = dq_df1['Column'] == good_col
+            new_string =  f"There are no numeric columns with outliers in this dataset"
+            dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+            dq_df1.loc[mask0,'first_comma'] = ', '
                 
-    # Detect high cardinality features
+    # Detect high cardinality features only in categorical columns
     cardinality_threshold = 100 # Define a threshold for high cardinality
-    cardinality = df.nunique() # Get the number of unique values in each column
+    cardinality = df[cat_cols].nunique() # Get the number of unique values in each categorical column
     high_card_cols = cardinality[cardinality > cardinality_threshold].index.tolist() # Get the columns with high cardinality
     if len(high_card_cols) > 0:
-        print(f"There are {len(high_card_cols)} columns with high cardinality (>{cardinality_threshold}) in the dataset. You may want to reduce them using encoding techniques or feature selection methods.")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string = f"There are {len(high_card_cols)} columns with high cardinality (>{cardinality_threshold}) in the dataset. You may want to reduce them using encoding techniques or feature selection methods."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
         for col in high_card_cols:
-            if verbose:
-                print(f"    {col} has {cardinality[col]} unique values.")
+            mask0 = dq_df2['Column'] == col
+            new_string = f"high cardinality with {cardinality[col]} unique values."
+            dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+            dq_df2.loc[mask0,'first_comma'] = ', '
+    else:
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no high cardinality columns in this dataset"
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
 
     # Detect highly correlated features
     correlation_threshold = 0.8 # Define a threshold for high correlation
@@ -158,12 +277,20 @@ def find_dq(df, target=None, verbose=0):
     upper_triangle = correlation_matrix.where(np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)) # Get the upper triangle of the matrix
     high_corr_cols = [column for column in upper_triangle.columns if any(upper_triangle[column] > correlation_threshold)] # Get the columns with high correlation
     if len(high_corr_cols) > 0:
-        print(f"There are {len(high_corr_cols)} columns with higher than {correlation_threshold} correlation in the dataset. You may want to drop one of them or use dimensionality reduction techniques.")
+        mask0 = dq_df1['Column'] == bad_col
+        new_string = f"There are {len(high_corr_cols)} columns with higher than {correlation_threshold} correlation in the dataset. You may want to drop one of them or use dimensionality reduction techniques."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
         for col in high_corr_cols:
-            if verbose:
-                print(f"    {col} has a high correlation with {upper_triangle[col][upper_triangle[col] > correlation_threshold].index.tolist()}")
+            mask0 = dq_df2['Column'] == col
+            new_string = f"has a high correlation with {upper_triangle[col][upper_triangle[col] > correlation_threshold].index.tolist()}"
+            dq_df2.loc[mask0,new_col] += dq_df2.loc[mask0,'first_comma'] + new_string
+            dq_df2.loc[mask0,'first_comma'] = ', '
     else:
-        print('There are no highly correlated columns in the dataset.')
+        mask0 = dq_df1['Column'] == good_col
+        new_string =  f"There are no highly correlated columns in the dataset."
+        dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+        dq_df1.loc[mask0,'first_comma'] = ', '
 
     # First see if this is a classification problem 
     if target is not None:
@@ -220,9 +347,34 @@ def find_dq(df, target=None, verbose=0):
                 if verbose:
                     print(f"    {col} has a correlation higher than {leakage_threshold} with {target_col}")
         else:
-            print('There are no target leakage columns in the dataset')
+            mask0 = dq_df1['Column'] == good_col
+            new_string =  f'There are no target leakage columns in the dataset'
+            dq_df1.loc[mask0,new_col] += dq_df1.loc[mask0,'first_comma'] + new_string
+            dq_df1.loc[mask0,'first_comma'] = ', '
     else:
         print('There is no target given. Hence no target leakage columns detected in the dataset')
+
+    dq_df1.drop('first_comma', axis=1, inplace=True)
+    dq_df2.drop('first_comma', axis=1, inplace=True)
+    for col in list(df):
+        mask0 = dq_df2['Column'] == col
+        mask1 = dq_df2[new_col] == ""
+        dq_df2.loc[mask0&mask1,new_col] = "No issue"
+
+    from IPython.display import display
+
+    if verbose >= 0:
+        all_rows = dq_df1.shape[0]
+        ax = dq_df1.head(all_rows).style.background_gradient(cmap='Reds').set_properties(**{'font-family': 'Segoe UI'})
+        display(ax);
+
+    if verbose >= 1:
+        all_rows = dq_df2.shape[0]
+        ax = dq_df2.head(all_rows).style.background_gradient(cmap='Reds').set_properties(**{'font-family': 'Segoe UI'})
+        display(ax);
+
+    # Return the dq_df1 as a table
+    return dq_df2
 
 ##################################################################################################
 # Import pandas and numpy libraries
@@ -523,7 +675,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.2'
+version_number =  '1.3'
 print(f"""{module_type} pandas_dq ({version_number}). Use fit and transform using:
 from pandas_dq import find_dq, Fix_DQ
 fdq = Fix_DQ(quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
