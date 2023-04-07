@@ -110,8 +110,12 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         df.dtypes,
         columns=['Data Type']
     )
+
     missing_values = df.isnull().sum()
     missing_cols = missing_values[missing_values > 0].index.tolist()
+    number_cols = df.select_dtypes(include=["integer", "float"]).columns.tolist() # Get numerical columns
+    float_cols = df.select_dtypes(include=[ "float"]).columns.tolist() # Get float columns
+
     missing_data = pd.DataFrame(
         missing_values,
         columns=['Missing Values']
@@ -120,7 +124,10 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         columns=['Unique Values']
     )
     for row in list(df.columns.values):
-        unique_values.loc[row] = [df[row].nunique()]
+        if row in float_cols:
+            unique_values.loc[row] = ["NA"]
+        else:
+            unique_values.loc[row] = [df[row].nunique()]
         
     maximum_values = pd.DataFrame(
         columns=['Maximum Value']
@@ -131,13 +138,18 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     for row in list(df.columns.values):
         if row not in missing_cols:
             maximum_values.loc[row] = [df[row].max()]
+        elif row in number_cols:
+            maximum_values.loc[row] = [df[row].max()]
     for row in list(df.columns.values):
         if row not in missing_cols:
             minimum_values.loc[row] = [df[row].min()]
+        elif row in number_cols:
+            minimum_values.loc[row] = [df[row].min()]
 
-    ### now generate the data quality report 
+    ### now generate the data quality starter dataframe
     dq_df2 = data_types.join(missing_data).join(unique_values).join(minimum_values).join(maximum_values)
 
+    ### set up additional columns    
     dq_df2["first_comma"] = ""
     dq_df2[new_col] = f""
     
@@ -262,7 +274,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
                     dq_df1.loc[bad_col,'first_comma'] = ', '
                     first_time =False
                 ### check if there are outlier columns and print them ##
-                new_string = f"has {len(outliers)} outliers greater than upper bound or lower than lower bound: {min(outliers.values)}. Cap them or remove them."
+                new_string = f"has {len(outliers)} outliers greater than upper bound ({upper_bound}) or lower than lower bound: {lower_bound}. Cap them or remove them."
                 dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
                 dq_df2.loc[col,'first_comma'] = ', '
         if len(outlier_cols) < 1:
@@ -737,10 +749,8 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.5'
-print(f"""{module_type} pandas_dq ({version_number}). Use fit and transform using:
-from pandas_dq import find_dq, Fix_DQ
-fdq = Fix_DQ(quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
-                 rare_threshold=0.05, correlation_threshold=0.8)
+version_number =  '1.6'
+print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest version.
+from pandas_dq import dq_report, Fix_DQ
 """)
 #################################################################################

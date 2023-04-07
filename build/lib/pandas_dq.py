@@ -40,8 +40,6 @@
 # Define a function to print data cleaning suggestions
 # Import pandas and numpy libraries
 import pandas as pd
-import polars as pl
-import pyarrow as pa
 import numpy as np
 import copy
 import os
@@ -76,9 +74,11 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
                 df = pd.read_csv(data, nrows=1000000)
             elif csv_engine == 'polars':
                 # Upload the data file into Polars
+                import polars as pl
                 df_polars = pl.read_csv(data, nrows=1000000)
             elif csv_engine == 'parquet':
                 # Upload the data file into Parquet
+                import pyarrow as pa
                 df_parquet = pa.read_table(data)
         elif ext == ".parquet":
             df = pd.read_parquet(data)
@@ -433,20 +433,27 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         X = copy.deepcopy(X)
         
         # Get the numerical columns
-        num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
+        num_cols = X.select_dtypes(include=[ "float"]).columns.tolist()
         
-        # Loop through each numerical column
+        # Loop through each float column
         for col in num_cols:
             # Check if the column has an upper bound calculated in the fit method
             if col in self.upper_bounds_:
                 # Cap the outliers using the upper bound
                 X[col] = np.where(X[col] > self.upper_bounds_[col], self.upper_bounds_[col], X[col])
+            else:
+                # Just print a message and don't cap the outliers in that column
+                print(f"No cap value found for column {col}. Continue...")                
         
         # Return the DataFrame with capped outliers
         return X
     
     # Define a function to impute the missing values in categorical and numerical columns using the constant values
     def impute_missing(self, X):
+        """
+        ### impute_missing can fill missing value using a global default value or a 
+        ### dictionary of fill values for each column and apply that fill value to each column.
+        """
         # Check if X is a pandas DataFrame
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
@@ -461,10 +468,33 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         
         # Impute the missing values in categorical columns with the cat_fill_value
-        X[cat_cols] = X[cat_cols].fillna(self.cat_fill_value)
+        # Loop through the columns of cat_cols
+        for col in cat_cols:
+            # Check if the column is in the fill_values dictionary
+            if isinstance(self.cat_fill_value, dict):
+                if col in self.cat_fill_value:
+                    # Impute the missing values in the column with the corresponding fill value
+                    X[col] = X[[col]].fillna(self.cat_fill_value[col]).values
+                else:
+                    ### use a default value for that column since it is not specified
+                    X[col] = X[[col]].fillna("missing").values
+            else:
+                ### use a global default value for all columns
+                X[col] = X[[col]].fillna(self.cat_fill_value).values
         
         # Impute the missing values in numerical columns with the num_fill_value
-        X[num_cols] = X[num_cols].fillna(self.num_fill_value)
+        # Loop through the columns of num_cols
+        for col in num_cols:
+            # Check if the column is in the fill_values dictionary
+            if isinstance(self.num_fill_value, dict):
+                if col in self.num_fill_value:
+                    # Impute the missing values in the column with the corresponding fill value
+                    X[col] = X[[col]].fillna(self.num_fill_value[col]).values
+                else:
+                    ### use a default value for that column since it is not specified
+                    X[col] = X[[col]].fillna(-999).values
+            else:
+                X[col] = X[[col]].fillna(self.num_fill_value).values
         
         # Return the DataFrame with imputed missing values
         return X
@@ -523,15 +553,15 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         
         # Drop duplicate rows
         dup_rows = X.duplicated().sum()
-        X = X.drop_duplicates()
         if dup_rows > 0:
-            print(f'Dropping {dup_rows} rows')
+            print(f'Alert: Dropping {dup_rows} rows can sometimes cause column data types to change to object. Double-check!')
+            X = X.drop_duplicates()
         
         # Drop duplicate columns
         dup_cols = X.T.duplicated().sum()
-        X = X.T.drop_duplicates().T
         if dup_cols > 0:
-            print(f'Dropping {dup_cols} cols')
+            print(f'Alert: Dropping {dup_cols} cols can sometimes cause column data types to change to object. Double-check!')
+            X = X.T.drop_duplicates().T
         
         # Return the DataFrame with no duplicates
         return X
@@ -544,7 +574,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
             X = pd.DataFrame(X)
         
         # Get the numerical columns
-        num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
+        num_cols = X.select_dtypes(include=["float"]).columns.tolist()
         
         # Define a threshold for skewness
         skew_threshold = 0.5
@@ -576,6 +606,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
+        float_cols = X.select_dtypes(include=["float"]).columns.tolist()
         
         # Detect highly correlated features
         self.drop_corr_cols_ = []
@@ -592,11 +623,22 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         self.upper_bounds_ = {}
         
         # Loop through each numerical column
+        #### processing of quantiles is only for float columns or those in dict ###
         if self.quantile is None:
-            #### Don't do any processing is quantile is set to None ###
-            pass
+            ### you still need to calculate upper bounds needed capping for infinite values ##
+            base_quantile = 0.75
+            for col in float_cols:
+                # Get the third quartile
+                q3 = X[col].quantile(base_quantile)
+                # Get the interquartile range
+                iqr = X[col].quantile(base_quantile) - X[col].quantile(1 - base_quantile)
+                # Calculate the upper bound
+                upper_bound = q3 + 1.5 * iqr
+                # Store the upper bound in the dictionary
+                self.upper_bounds_[col] = upper_bound
         else:
-            for col in num_cols:
+            ### calculate upper bounds to cap outliers using quantile given ##
+            for col in float_cols:
                 # Get the third quartile
                 q3 = X[col].quantile(self.quantile)
                 # Get the interquartile range
@@ -612,8 +654,8 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Define a threshold for skewness
         skew_threshold = 0.5
         
-        # Loop through each numerical column
-        for col in num_cols:
+        # Loop through each float column
+        for col in float_cols:
             # Calculate the skewness of the column
             skewness = X[col].skew()
             # Check if the skewness is above the threshold
@@ -654,7 +696,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
             X = pd.DataFrame(X)
-            
+        
         ### drop mixed data type columns from further processing ##
         if len(self.mixed_type_cols_) > 0:
             X = X.drop(self.mixed_type_cols_, axis=1)
@@ -671,8 +713,15 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # find duplicate columns and rows
         X = self.drop_duplicates(X)
         
-        # Call the cap_outliers function on X and assign it to a new variable 
-        capped_X = self.cap_outliers(X)
+        # Call the impute_missing function first and assign it to a new variable 
+        imputed_X = self.impute_missing(X)
+
+        if self.quantile is None:
+            #### Don't do any processing if quantile is set to None ###
+            capped_X = copy.deepcopy(imputed_X)
+        else:
+            # Call the cap_outliers function on X and assign it to a new variable 
+            capped_X = self.cap_outliers(imputed_X)
         
         # Call the replace_infinite function on capped_X and assign it to a new variable 
         infinite_X = self.replace_infinite(capped_X)
@@ -681,17 +730,14 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         rare_X = self.group_rare_categories(infinite_X)
         
         # Call the power transformer function on rare_X and assign it to a new variable 
-        power_X = self.transform_skewed(rare_X)
-        
-        # Call the impute_missing function on power_X and assign it to a new variable 
-        imputed_X = self.impute_missing(power_X)
-        
+        transformed_X = self.transform_skewed(rare_X)
+                
         # Return the transformed DataFrame
-        return imputed_X
+        return transformed_X
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.4'
+version_number =  '1.5'
 print(f"""{module_type} pandas_dq ({version_number}). Use fit and transform using:
 from pandas_dq import find_dq, Fix_DQ
 fdq = Fix_DQ(quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
