@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: pandas-dq
-Version: 1.2
+Version: 1.3
 Summary: Clean your data using a scikit-learn transformer in a single line of code
 Home-page: https://github.com/AutoViML/pandas_dq
 Author: Ram Seshadri
@@ -126,8 +126,9 @@ Description: # pandas_dq
         <b>Caution:</b> X_train and y_train must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
         
         `find_dq` has only 3 arguments:
-        - `df`: default is a pandas DataFrame.
+        - `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file.
         - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
+        - `csv_engine`: default is `pandas`. If you want to load your file using any other backend engine such as `arrow` or `parquet` please specify it here.
          - `verbose`: This has 2 possible states:
           - `0` silent output. Great for running where it prints only high level data quality issues.
           - `1` more verbiage. Great for knowing details behind each issue and what the suggestions are.
