@@ -29,17 +29,19 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 
 <p>`dq_report` is a function that is the most popular way to use pandas_dq and it performs following data quality analysis steps:
 <ol>
-<li>It detects missing values and suggests to impute them with mean, median, mode, or a constant value.</li>
-<li>It identifies rare categories and suggests to group them into a single category or drop them.</li>
-<li>It finds infinite values and suggests to replace them with NaN or a large value.</li>
-<li>It detects mixed data types and suggests to convert them to a single type or split them into multiple columns.</li>
-<li>It detects outliers and suggests to remove them or use robust statistics.</li>
-<li>It detects high cardinality features and suggests to reduce them using encoding techniques or feature selection methods.</li>
-<li>It detects highly correlated features and suggests to drop one of them or use dimensionality reduction techniques.</li>
-<li>It detects duplicate rows and columns and suggests to drop them or keep only one copy.</li>
-<li>It detects skewed distributions and suggests to apply transformations or scaling techniques. </li>
-<li>It detects imbalanced classes and suggests to use resampling techniques or class weights. </li>
-<li>It detects feature leakage and suggests to avoid using features that are not available at prediction time. </li>
+<li>It detects ID columns</li>
+<li>It detects zero-variance columns </li>
+<li>It identifies rare categories (less than 5% of categories in a column)</li>
+<li>It finds infinite values in a column</li>
+<li>It detects mixed data types (i.e. a column that has more than a single data type)</li>
+<li>It detects outliers (i.e. a float column that is beyond the Inter Quartile Range)</li>
+<li>It detects high cardinality features (i.e. a feature that has more than 100 categories)</li>
+<li>It detects highly correlated features (i.e. two features that have an absolute correlation higher than 0.8)</li>
+<li>It detects duplicate rows (i.e. the same row occurs more than once in the dataset)</li>
+<li>It detects duplicate columns (i.e. the same column occurs twice or more in the dataset)</li>
+<li>It detects skewed distributions (i.e. a feature that has a skew more than 1.0) </li>
+<li>It detects imbalanced classes (i.e. target variable has one class more than other in a significant way) </li>
+<li>It detects feature leakage (i.e. a feature that is highly correlated to target with correlation > 0.8)</li>
 </ol>
 Notice that for large datasets, this report generation may take time. So please be patient while it analyzes your dataset!
 
@@ -48,6 +50,22 @@ Notice that for large datasets, this report generation may take time. So please 
 ![fix_dq](./images/fix_dq_screenshot.png)
 
 <p>`Fix_DQ` is a great way to clean an entire train data set and apply the same steps in an MLOps pipeline to a test dataset.  `Fix_DQ` can be used to detect most issues in your data (similar to dq_report but without the target related steps) in one step (during `fit` method). This transformer can then be saved (or "pickled") for applying the same steps on test data either at the same time or later.<br>
+<p>Fix_DQ will perform following data quality cleaning steps:
+<ol>
+<li>It removes ID columns from further processing</li>
+<li>It removes zero-variance columns from further processing</li>
+<li>It identifies rare categories and groups them into a single category called "Rare"</li>
+<li>It finds infinite values and replaces them with an upper bound based on Inter Quartile Range</li>
+<li>It detects mixed data types and drops those mixed-type columns from further processing</li>
+<li>It detects outliers and suggests to remove them or use robust statistics.</li>
+<li>It detects high cardinality features but leaves them as it is.</li>
+<li>It detects highly correlated features and drops one of them (whichever comes first in the column sequence)</li>
+<li>It detects duplicate rows and drops one of them or keeps only one copy of duplicate rows</li>
+<li>It detects duplicate columns and drops one of them or keeps only one copy</li>
+<li>It detects skewed distributions and applies log or box-cox transformations on them </li>
+<li>It detects imbalanced classes and leaves them as it is </li>
+<li>It detects feature leakage and drops one of those features if they are highly correlated to target </li>
+</ol>
 
 
 ###  How can we use Fix_DQ in GridSearchCV to find the best model pipeline?

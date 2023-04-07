@@ -115,6 +115,8 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     missing_cols = missing_values[missing_values > 0].index.tolist()
     number_cols = df.select_dtypes(include=["integer", "float"]).columns.tolist() # Get numerical columns
     float_cols = df.select_dtypes(include=[ "float"]).columns.tolist() # Get float columns
+    id_cols = []
+    zero_var_cols = []
 
     missing_data = pd.DataFrame(
         missing_values,
@@ -128,6 +130,10 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
             unique_values.loc[row] = ["NA"]
         else:
             unique_values.loc[row] = [df[row].nunique()]
+            if df[row].nunique() == df.shape[0]:
+                id_cols.append(row)
+            elif df[row].nunique() == 1:
+                zero_var_cols.append(row)
         
     maximum_values = pd.DataFrame(
         columns=['Maximum Value']
@@ -153,6 +159,36 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     dq_df2["first_comma"] = ""
     dq_df2[new_col] = f""
     
+    # Detect ID columns in dataset and recommend removing them
+    if len(id_cols) > 0:
+        new_string = f"There are ID columns in the dataset. Recommend removing them before modeling."
+        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
+        dq_df1.loc[bad_col,'first_comma'] = ', '
+        for col in id_cols:
+            # Append a row to the dq_df1 with the column name and the issue only if the column has a missing value
+            new_string = f"Possible ID colum: drop before modeling process."
+            dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
+            dq_df2.loc[col,'first_comma'] = ', '
+    else:
+        new_string = f"There are no ID columns in the dataset. So no ID columns to remove before modeling."
+        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
+        dq_df1.loc[good_col,'first_comma'] = ', '
+
+    # Detect ID columns in dataset and recommend removing them
+    if len(zero_var_cols) > 0:
+        new_string = f"There are zero-variance columns in the dataset. Recommend removing them before modeling."
+        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
+        dq_df1.loc[bad_col,'first_comma'] = ', '
+        for col in zero_var_cols:
+            # Append a row to the dq_df1 with the column name and the issue only if the column has a missing value
+            new_string = f"Zero-variance colum: drop before modeling process."
+            dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
+            dq_df2.loc[col,'first_comma'] = ', '
+    else:
+        new_string = f"There are no zero-variance columns in the dataset. So no zero-variance columns to remove before modeling."
+        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
+        dq_df1.loc[good_col,'first_comma'] = ', '
+
     # Detect missing values and suggests to impute them with mean, median, mode, or a constant value123
     #missing_values = df.isnull().sum()
     #missing_cols = missing_values[missing_values > 0].index.tolist()
@@ -566,13 +602,13 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Drop duplicate rows
         dup_rows = X.duplicated().sum()
         if dup_rows > 0:
-            print(f'Alert: Dropping {dup_rows} rows can sometimes cause column data types to change to object. Double-check!')
+            print(f'Alert: Dropping {dup_rows} duplicate rows can sometimes cause column data types to change to object. Double-check!')
             X = X.drop_duplicates()
         
         # Drop duplicate columns
         dup_cols = X.T.duplicated().sum()
         if dup_cols > 0:
-            print(f'Alert: Dropping {dup_cols} cols can sometimes cause column data types to change to object. Double-check!')
+            print(f'Alert: Dropping {dup_cols} duplicate cols can sometimes cause column data types to change to object. Double-check!')
             X = X.T.drop_duplicates().T
         
         # Return the DataFrame with no duplicates
@@ -587,16 +623,12 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["float"]).columns.tolist()
-        
-        # Define a threshold for skewness
-        skew_threshold = 0.5
-        
+                
         # Loop through each numerical column
         for col in num_cols:
             # Find if a column transformer exists for this column
             if col in self.col_transformers_:
                 # Cap the outliers using the upper bound
-                # Check if the skewness is above the threshold
                 if str(self.col_transformers_[col]).split("(")[0] == "PowerTransformer":
                     ### power transformer expects Pandas DataFrame
                     pt = self.col_transformers_[col]
@@ -619,6 +651,17 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         float_cols = X.select_dtypes(include=["float"]).columns.tolist()
+        non_float_cols = left_subtract(X.columns, float_cols)
+
+        # Detect ID columns
+        self.id_cols_ = [column for column in non_float_cols if X[column].nunique() == X.shape[0]]
+        if len(self.id_cols_) > 0:
+            print(f"{len(self.id_cols_)} ID cols will be dropped from further processing: {self.id_cols_}")
+
+        # Detect zero-variance columns
+        self.zero_var_cols_ = [column for column in non_float_cols if X[column].nunique() == 1]
+        if len(self.zero_var_cols_) > 0:
+            print(f"    {len(self.zero_var_cols_)} zero-variance cols will be dropped from further processing: {self.zero_var_cols_}")
         
         # Detect highly correlated features
         self.drop_corr_cols_ = []
@@ -664,7 +707,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         self.col_transformers_ = {}
         
         # Define a threshold for skewness
-        skew_threshold = 0.5
+        skew_threshold = 1.0
         
         # Loop through each float column
         for col in float_cols:
@@ -710,8 +753,22 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
             X = pd.DataFrame(X)
         
         ### drop mixed data type columns from further processing ##
+        if len(self.id_cols_) > 0:
+            X = X.drop(self.id_cols_, axis=1)
+
+        ### drop mixed data type columns from further processing ##
+        if len(self.zero_var_cols_) > 0:
+            X = X.drop(self.zero_var_cols_, axis=1)
+
+        ### drop mixed data type columns from further processing ##
         if len(self.mixed_type_cols_) > 0:
-            X = X.drop(self.mixed_type_cols_, axis=1)
+            drop_cols = left_subtract(self.mixed_type_cols_, self.zero_var_cols_+self.id_cols_)
+            if len(drop_cols) > 0:
+                X = X.drop(drop_cols, axis=1)
+            else:
+                drop_cols = left_subtract(self.zero_var_cols_+self.id_cols_, self.mixed_type_cols_)
+                if len(drop_cols) > 0:
+                    X = X.drop(drop_cols, axis=1)
             
         ### drop highly correlated columns from further processing ##
         if len(self.drop_corr_cols_) > 0:
@@ -749,7 +806,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.6'
+version_number =  '1.7'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest version.
 from pandas_dq import dq_report, Fix_DQ
 """)
