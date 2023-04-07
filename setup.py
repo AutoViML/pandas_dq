@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="pandas_dq",
-    version="1.4",
+    version="1.5",
     author="Ram Seshadri",
     # author_email="author@example.com",
     description="Clean your data using a scikit-learn transformer in a single line of code",
@@ -19,7 +19,6 @@ setuptools.setup(
         "numpy>=1.21.5",
         "pandas>=1.3.5",
         "scikit-learn>=0.24.2",
-        "polars",
     ],
     include_package_data = True,
     classifiers=[

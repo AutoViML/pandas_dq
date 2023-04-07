@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: pandas-dq
-Version: 1.3
+Version: 1.4
 Summary: Clean your data using a scikit-learn transformer in a single line of code
 Home-page: https://github.com/AutoViML/pandas_dq
 Author: Ram Seshadri
@@ -28,13 +28,13 @@ Description: # pandas_dq
         ![pandas_dq](./images/pandas_dq_logo.png)
         
         ## Uses
-        `pandas_dq` has two important modules: `find_dq` and `Fix_DQ`. 
+        `pandas_dq` has two important modules: `dq_report` and `Fix_DQ`. 
         
-        ### 1.  find_dq function
+        ### 1.  dq_report function
         
-        ![find_dq](./images/find_dq_screenshot.png)
+        ![dq_report_code](./images/find_dq_screenshot.png)
         
-        <p>`find_dq` is a function that is probably the most popular way to use pandas_dq and it performs following data quality analysis steps:
+        <p>`dq_report` is a function that is probably the most popular way to use pandas_dq and it performs following data quality analysis steps:
         <ol>
         <li>It detects missing values and suggests to impute them with mean, median, mode, or a constant value.</li>
         <li>It identifies rare categories and suggests to group them into a single category or drop them.</li>
@@ -54,13 +54,11 @@ Description: # pandas_dq
         
         ![fix_dq](./images/fix_dq_screenshot.png)
         
-        <p>`Fix_DQ` is a great way to clean an entire train data set and apply the same steps in an MLOps pipeline to a test dataset.  `Fix_DQ` can be used to detect most issues in your data (similar to find_dq but without the target related steps) in one step (during `fit` method). This transformer can then be saved (or "pickled") for applying the same steps on test data either at the same time or later.<br>
+        <p>`Fix_DQ` is a great way to clean an entire train data set and apply the same steps in an MLOps pipeline to a test dataset.  `Fix_DQ` can be used to detect most issues in your data (similar to dq_report but without the target related steps) in one step (during `fit` method). This transformer can then be saved (or "pickled") for applying the same steps on test data either at the same time or later.<br>
         
         
         ###  How can we use Fix_DQ in GridSearchCV to find the best model pipeline?
         <p>This is another way to find the best data cleaning steps for your train data and then use the cleaned data in hyper parameter tuning using GridSearchCV or RandomizedSearchCV along with a LightGBM or an XGBoost or a scikit-learn model.<br>
-        
-        
         
         ## Install
         <p>
@@ -108,12 +106,16 @@ Description: # pandas_dq
         X_test_transformed = fdq.transform(X_test)
         ```
         
-        ### if you are not using the Transformer, you can simply call the function, find_dq
+        ### if you are not using the Transformer, you can simply call the function, dq_report
         
         ```
-        from pandas_dq import find_dq
-        find_dq(df, target=target, verbose=0)
+        from pandas_dq import dq_report
+        dq_report(data, target=target, csv_engine="pandas", verbose=1)
         ```
+        
+        It prints out a data quality report like this:
+        
+        ![dq_report](./images/dq_report_screenshot.png)
         
         ## API
         
@@ -123,17 +125,17 @@ Description: # pandas_dq
         
         **Arguments**
         
-        <b>Caution:</b> X_train and y_train must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
-        
-        `find_dq` has only 3 arguments:
+        `dq_report` has only 4 arguments:
         - `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file.
         - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
         - `csv_engine`: default is `pandas`. If you want to load your file using any other backend engine such as `arrow` or `parquet` please specify it here.
-         - `verbose`: This has 2 possible states:
-          - `0` silent output. Great for running where it prints only high level data quality issues.
-          - `1` more verbiage. Great for knowing details behind each issue and what the suggestions are.
+        - `verbose`: This has 2 possible states:
+          - `0` summary report. Prints only the summary level data quality issues in the dataset. Great for managers.
+          - `1` detailed report. Prints all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
         
         `Fix_DQ` has slightly more arguments:
+        <b>Caution:</b> X_train and y_train in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
+        
         - `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.
         - `cat_fill_value`: string ("missing"): Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
         - `num_fill_value`: integer or float (999): Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.

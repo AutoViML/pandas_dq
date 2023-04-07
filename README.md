@@ -27,7 +27,7 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 
 ![dq_report_code](./images/find_dq_screenshot.png)
 
-<p>`dq_report` is a function that is probably the most popular way to use pandas_dq and it performs following data quality analysis steps:
+<p>`dq_report` is a function that is the most popular way to use pandas_dq and it performs following data quality analysis steps:
 <ol>
 <li>It detects missing values and suggests to impute them with mean, median, mode, or a constant value.</li>
 <li>It identifies rare categories and suggests to group them into a single category or drop them.</li>
@@ -41,7 +41,7 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 <li>It detects imbalanced classes and suggests to use resampling techniques or class weights. </li>
 <li>It detects feature leakage and suggests to avoid using features that are not available at prediction time. </li>
 </ol>
-
+Notice that for large datasets, this report generation may take time. So please be patient while it analyzes your dataset!
 
 ### 2.  Fix_DQ class: a scikit_learn transformer which can detect data quality issues and clean them all in one line of code
 
@@ -113,15 +113,14 @@ It prints out a data quality report like this:
 ## API
 
 <p>
-pandas_dq has a very simple API with the following inputs. You need to create a sklearn-compatible transformer pipeline object by importing Fix_DQ from pandas_dq library. <p>
-Once you import it, you can define the object by giving several options such as:
+pandas_dq has a very simple API with just two modules to import: one will find data quality issues in your data and the other will fix it. Simple!
 
 **Arguments**
 
 `dq_report` has only 4 arguments:
 - `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file.
 - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
-- `csv_engine`: default is `pandas`. If you want to load your file using any other backend engine such as `arrow` or `parquet` please specify it here.
+- `csv_engine`: default is `pandas`. If you want to load your CSV file using any other backend engine such as `arrow` or `parquet` please specify it here. This option only impacts CSV files.
 - `verbose`: This has 2 possible states:
   - `0` summary report. Prints only the summary level data quality issues in the dataset. Great for managers.
   - `1` detailed report. Prints all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
@@ -130,10 +129,10 @@ Once you import it, you can define the object by giving several options such as:
 <b>Caution:</b> X_train and y_train in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
 
 - `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.
-- `cat_fill_value`: string ("missing"): Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
-- `num_fill_value`: integer or float (999): Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. I will try to change it to a dictionary so that you can specify different values for different columns.
-- `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less 5% (say) of samples, then it will considered rare. All rare categories will be merged with a category value called "Rare". 
-- `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, the variable will be dropped. 
+- `cat_fill_value`: string ("missing") or a dictionary: Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
+- `num_fill_value`: integer (99) or float value (999.0) or a dictionary: Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
+- `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less than say 5% (0.05) of samples, then it will be considered rare. All rare categories in that column will be merged under a new category named "Rare". 
+- `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, if two variables are correlated, one of them will be dropped. The program will tell you which variable is being dropped. You can switch the sequence of variables in your dataset if you want the one or other dropped.
 <p>
 
 ## Maintainers
