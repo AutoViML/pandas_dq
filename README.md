@@ -135,15 +135,16 @@ pandas_dq has a very simple API with just two modules to import: one will find d
 
 **Arguments**
 
-`dq_report` has only 4 arguments:
-- `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file.
+`dq_report` has only 4 arguments:<br>
+<b>Caution:</b> For very large data sets, we randomly sample 100K rows from your CSV file to speed up reporting. If you want a larger sample, simply read in your file offline into a pandas dataframe and send it in as input, and we will load it as it is. This is one way to go around our speed limitations.
+- `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file. 
 - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
 - `csv_engine`: default is `pandas`. If you want to load your CSV file using any other backend engine such as `arrow` or `parquet` please specify it here. This option only impacts CSV files.
 - `verbose`: This has 2 possible states:
   - `0` summary report. Prints only the summary level data quality issues in the dataset. Great for managers.
   - `1` detailed report. Prints all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
 
-`Fix_DQ` has slightly more arguments:
+`Fix_DQ` has slightly more arguments:<br>
 <b>Caution:</b> X_train and y_train in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
 
 - `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.

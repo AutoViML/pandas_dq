@@ -69,26 +69,38 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         ext = os.path.splitext(data)[-1]
         # Load the file into a pandas dataframe based on the extension
         if ext == ".csv":
+            print("If large dataset, we will randomly sample 100K rows to speed up processing...")
             if csv_engine == 'pandas':
                 # Upload the data file into Pandas
-                df = pd.read_csv(data, nrows=1000000)
+                df = pd.read_csv(data)
             elif csv_engine == 'polars':
                 # Upload the data file into Polars
                 import polars as pl
-                df_polars = pl.read_csv(data, nrows=1000000)
+                df = pl.read_csv(data)
             elif csv_engine == 'parquet':
                 # Upload the data file into Parquet
                 import pyarrow as pa
-                df_parquet = pa.read_table(data)
+                df = pa.read_table(data)
+            else :
+                # print the pandas version
+                if str(pd.__version__)[0] == '2':
+                    print(f"pandas version={pd.__version__}. Hence using pyarrow backend.")
+                    df = pd.read_csv(data, engine='pyarrow', dtype_backend='pyarrow')
+                else:
+                    print(f"pandas version={pd.__version__}. Hence using pandas backend.")
+                    df = pd.read_csv(data)
         elif ext == ".parquet":
             df = pd.read_parquet(data)
-        elif ext in [".feather", ".arrow"]:
+        elif ext in [".feather", ".arrow", "ftr"]:
             df = pd.read_feather(data)
         else:
             print("Unsupported file format. Please use CSV, parquet, feather or arrow.")
-            return
+            return data
+        ######## This is to sample the data if it is too large ###
+        if df.shape[0] >= 1000000:
+            df = df.sample(100000)
     elif isinstance(data, pd.DataFrame):
-        # Use the input dataframe as is
+        print("We use the input dataframe as is...")
         df = data
     else:
         print("Invalid input. Please provide a string (filename) or a dataframe.")
@@ -112,6 +124,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     )
 
     missing_values = df.isnull().sum()
+    missing_values_pct = ((df.isnull().sum()/df.shape[0])*100)
     missing_cols = missing_values[missing_values > 0].index.tolist()
     number_cols = df.select_dtypes(include=["integer", "float"]).columns.tolist() # Get numerical columns
     float_cols = df.select_dtypes(include=[ "float"]).columns.tolist() # Get float columns
@@ -119,17 +132,17 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     zero_var_cols = []
 
     missing_data = pd.DataFrame(
-        missing_values,
-        columns=['Missing Values']
+        missing_values_pct,
+        columns=['Missing Values%']
     )
     unique_values = pd.DataFrame(
-        columns=['Unique Values']
+        columns=['Unique Values%']
     )
     for row in list(df.columns.values):
         if row in float_cols:
             unique_values.loc[row] = ["NA"]
         else:
-            unique_values.loc[row] = [df[row].nunique()]
+            unique_values.loc[row] = [int(100*df[row].nunique()/df.shape[0])]
             if df[row].nunique() == df.shape[0]:
                 id_cols.append(row)
             elif df[row].nunique() == 1:
@@ -310,7 +323,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
                     dq_df1.loc[bad_col,'first_comma'] = ', '
                     first_time =False
                 ### check if there are outlier columns and print them ##
-                new_string = f"has {len(outliers)} outliers greater than upper bound ({upper_bound}) or lower than lower bound: {lower_bound}. Cap them or remove them."
+                new_string = f"has {len(outliers)} outliers greater than upper bound ({upper_bound}) or lower than lower bound({lower_bound}). Cap them or remove them."
                 dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
                 dq_df2.loc[col,'first_comma'] = ', '
         if len(outlier_cols) < 1:
@@ -327,7 +340,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
         dq_df1.loc[bad_col,'first_comma'] = ', '
         for col in high_card_cols:
-            new_string = f"high cardinality with {cardinality[col]} unique values."
+            new_string = f"high cardinality with {cardinality[col]} unique values: Use hash encoding or embedding to reduce dimension."
             dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
             dq_df2.loc[col,'first_comma'] = ', '
     else:
@@ -806,7 +819,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.7'
+version_number =  '1.8'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest version.
 from pandas_dq import dq_report, Fix_DQ
 """)
