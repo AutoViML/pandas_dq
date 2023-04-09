@@ -15,13 +15,17 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 <p>
 
 ## Introduction
+`pandas_dq` is a new python library for data quality analysis and improvement. It is fast, efficient and scalable. 
+
+<b>Alert!</b>>: If you are using `pandas version 2.0` ("the new pandas"), beware that weird errors are popping up in all kinds of libraries that use pandas underneath. Our `pandas_dq` library is no exception. So if you plan to use `pandas_dq` with `pandas version 2.0`, beware that you may see weird errors and we can't and won't fix them!
+
 ### What is pandas_dq?
 `pandas_dq` is a new python library for automatically cleaning your dirty dataset using pandas scikit_learn functions. You can analyze your dataset and fix them - all in a single line of code!
 
 ![pandas_dq](./images/pandas_dq_logo.png)
 
 ## Uses
-`pandas_dq` has two important modules: `dq_report` and `Fix_DQ`. 
+`pandas_dq` has two important modules: `dq_report` and `Fix_DQ`. <br>
 
 ### 1.  dq_report function
 
