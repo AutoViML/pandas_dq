@@ -287,7 +287,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     dup_rows = df.duplicated().sum()
     dup_cols = df.T.duplicated().sum()
     if dup_rows > 0:
-        new_string =  f"There are {len(dup_rows)} duplicate columns in the dataset. Keep only one copy of {dup_rows}."
+        new_string =  f"There are {dup_rows} duplicate columns in the dataset. Keep only one copy of them."
         dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
         dq_df1.loc[bad_col,'first_comma'] = ', '
     else:
@@ -295,7 +295,7 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
         dq_df1.loc[good_col,'first_comma'] = ', '
     if dup_cols > 0:
-        new_string =  f"There are {len(dup_cols)} duplicate columns in the dataset. Keep only one copy of {dup_cols}."
+        new_string =  f"There are {dup_cols} duplicate columns in the dataset. Keep only one copy of them."
         dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
         dq_df1.loc[bad_col,'first_comma'] = ', '
     else:
