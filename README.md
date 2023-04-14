@@ -88,7 +88,7 @@ The class has two methods: fit and transform. You need to initialize the class w
 
 The fit method takes a dataframe as an argument and checks if it matches the schema. The fit method first checks if the number of columns in the dataframe and the schema are equal. If not, it creates an exception. Finally, the fit method prints a table of exceptions it found in your data against the given schema. 
 
-The transform method takes a dataframe as n argument and based on the given schema and the exceptions, converts all the exception data columns to the given schema. If not, it skips the column and prints out an error message.
+The transform method takes a dataframe as an argument and based on the given schema and the exceptions, converts all the exception data columns to the given schema. If not, it skips the column and prints out an error message.
 
 ![dq_ds](./images/data_schema_checker.png)
 
@@ -136,6 +136,7 @@ X_train_transformed = fdq.fit_transform(X_train)
 
 # Transform X_test using the fitted transformer
 X_test_transformed = fdq.transform(X_test)
+
 ```
 
 ### if you are not using the Transformer, you can simply call the function, dq_report
@@ -149,10 +150,20 @@ It prints out a data quality report like this:
 
 ![dq_report](./images/dq_report_screenshot.png)
 
+### If you are using the DataSchemaChecker, you can try it with a schema like this:
+
+```
+from pandas_dq import DataSchemaChecker
+
+ds = DataSchemaChecker(schema=schema)
+ds.fit_transform(X_train)
+df.transform(X_test)
+```
+
 ## API
 
 <p>
-pandas_dq has a very simple API with just two modules to import: one will find data quality issues in your data and the other will fix it. Simple!
+pandas_dq has a very simple API with one major goal: find data quality issues in your data and fix them.
 
 **Arguments**
 
@@ -172,8 +183,25 @@ pandas_dq has a very simple API with just two modules to import: one will find d
 - `cat_fill_value`: string ("missing") or a dictionary: Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
 - `num_fill_value`: integer (99) or float value (999.0) or a dictionary: Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
 - `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less than say 5% (0.05) of samples, then it will be considered rare. All rare categories in that column will be merged under a new category named "Rare". 
-- `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, if two variables are correlated, one of them will be dropped. The program will tell you which variable is being dropped. You can switch the sequence of variables in your dataset if you want the one or other dropped.
-<p>
+- `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, if two variables are correlated, one of them will be dropped. The program will tell you which variable is being dropped. You can switch the sequence of variables in your dataset if you want the one or other dropped.<br>
+
+`DataSchemaChecker` is very similar in that it is also a scikit-learn transformer. It checks you data against a given schema:<br>
+What is a schema?
+  `A schema (dict) is a dictionary that maps column names to data types.`
+
+For Example: here is a schema with column names against their expected python dtypes (being surrounded by quote strings).
+
+```
+{'name': 'string',
+  'age': 'float32',
+  'gender': 'object',
+  'income': 'float64',
+  'target': 'integer'}
+```
+
+DataSchemaChecker has two methods:
+- `fit` method: Checks if the dataframe matches the schema and prints a table of errors if any.
+- `transform` method: Transforms the dataframe's dtypes to the given schema and prints errors if any.
 
 ## Maintainers
 

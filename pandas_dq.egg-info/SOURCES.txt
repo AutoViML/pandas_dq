@@ -1,0 +1,11 @@
+LICENSE
+MANIFEST.in
+README.md
+pandas_dq.py
+requirements.txt
+setup.py
+pandas_dq.egg-info/PKG-INFO
+pandas_dq.egg-info/SOURCES.txt
+pandas_dq.egg-info/dependency_links.txt
+pandas_dq.egg-info/requires.txt
+pandas_dq.egg-info/top_level.txt
