@@ -100,11 +100,25 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         if df.shape[0] >= 1000000:
             df = df.sample(100000)
     elif isinstance(data, pd.DataFrame):
-        print("We use the input dataframe as is...")
         df = data
     else:
         print("Invalid input. Please provide a string (filename) or a dataframe.")
         return
+
+    # Drop duplicate rows
+    dup_rows = df.duplicated().sum()
+    if dup_rows > 0:
+        print(f'Alert: Dropping {dup_rows} duplicate rows can sometimes cause column data types to change to object. Double-check!')
+        df = df.drop_duplicates()
+    
+    # Drop duplicate columns
+    dup_cols = df.columns[df.columns.duplicated()]
+    if len(dup_cols) > 0:
+        print(f'Alert: Dropping {len(dup_cols)} duplicate cols which can cause column data types to change to object. Double-check!')
+        ### DO NOT MODIFY THIS LINE. TOOK A LONG TIME TO MAKE IT WORK!!!
+        ###  THis is the only way that dropping duplicate columns works. This is not found anywhere!
+        df = df.T[df.T.index.duplicated(keep='first')].T
+
 
     ### This is the column that lists our data quality issues
     new_col = 'DQ Issue'
@@ -172,6 +186,25 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
     dq_df2["first_comma"] = ""
     dq_df2[new_col] = f""
     
+    #### This is the first thing you need to do ###############
+    if dup_rows > 0:
+        new_string =  f"There are {dup_rows} duplicate columns in the dataset. Keep only one copy of them."
+        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
+        dq_df1.loc[bad_col,'first_comma'] = ', '
+    else:
+        new_string =  f"There are no duplicate rows in this dataset"
+        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
+        dq_df1.loc[good_col,'first_comma'] = ', '
+    ### DO NOT CHANGE THE NEXT LINE. The logic for columns is different. 
+    if len(dup_cols) > 0:
+        new_string =  f"There are {len(dup_cols)} duplicate columns in the dataset. Keep only one copy of {dup_cols}."
+        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
+        dq_df1.loc[bad_col,'first_comma'] = ', '
+    else:
+        new_string =  f"There are no duplicate columns in this datatset"
+        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
+        dq_df1.loc[good_col,'first_comma'] = ', '
+
     # Detect ID columns in dataset and recommend removing them
     if len(id_cols) > 0:
         new_string = f"There are ID columns in the dataset. Recommend removing them before modeling."
@@ -283,26 +316,6 @@ def dq_report(data, target=None, csv_engine="pandas", verbose=0):
         dq_df1.loc[good_col,'first_comma'] = ', '
 
                 
-    # Detect duplicate rows and columns
-    dup_rows = df.duplicated().sum()
-    dup_cols = df.T.duplicated().sum()
-    if dup_rows > 0:
-        new_string =  f"There are {dup_rows} duplicate columns in the dataset. Keep only one copy of them."
-        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
-        dq_df1.loc[bad_col,'first_comma'] = ', '
-    else:
-        new_string =  f"There are no duplicate rows in this dataset"
-        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
-        dq_df1.loc[good_col,'first_comma'] = ', '
-    if dup_cols > 0:
-        new_string =  f"There are {dup_cols} duplicate columns in the dataset. Keep only one copy of them."
-        dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
-        dq_df1.loc[bad_col,'first_comma'] = ', '
-    else:
-        new_string =  f"There are no duplicate columns in this datatset"
-        dq_df1.loc[good_col,new_col] += dq_df1.loc[good_col,'first_comma'] + new_string
-        dq_df1.loc[good_col,'first_comma'] = ', '
-
     # Detect outliers in numeric cols
     num_cols = df.select_dtypes(include=["int", "float"]).columns.tolist() # Get numerical columns
     if len(num_cols) > 0:
@@ -605,8 +618,31 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Return the DataFrame with replaced infinite values
         return X
 
+    def detect_duplicates(self, X):
+        # Check if X is a pandas DataFrame
+        if not isinstance(X, pd.DataFrame):
+            # Convert X to a pandas DataFrame
+            X = pd.DataFrame(X)
+        
+        # Drop duplicate rows
+        dup_rows = X.duplicated().sum()
+        if dup_rows > 0:
+            print(f'Alert: Detecting {dup_rows} duplicate rows...')
+        
+        # Drop duplicate columns
+        dup_cols = X.columns[X.columns.duplicated()]
+        ### Remember that the logic for columns is different. Don't change this line!
+        if len(dup_cols) > 0:
+            print(f'Alert: Detecting {len(dup_cols)} duplicate cols...')
+            ### DO NOT TOUCH THIS LINE!! IT TOOK A LONG TIME TO MAKE IT WORK!!
+            ### Also if you don't delete these columns, then nothing after this line will work!
+            X = X.T[X.T.index.duplicated(keep='first')].T
+        
+        # Return the DataFrame with no duplicates
+        return X
+
     # Define a function to detect duplicate rows and columns and keep only one copy
-    def drop_duplicates(self, X):
+    def drop_duplicated(self, X):
         # Check if X is a pandas DataFrame
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
@@ -616,13 +652,15 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         dup_rows = X.duplicated().sum()
         if dup_rows > 0:
             print(f'Alert: Dropping {dup_rows} duplicate rows can sometimes cause column data types to change to object. Double-check!')
-            X = X.drop_duplicates()
+            X = X.drop_duplicates(keep='first')
         
         # Drop duplicate columns
-        dup_cols = X.T.duplicated().sum()
-        if dup_cols > 0:
-            print(f'Alert: Dropping {dup_cols} duplicate cols can sometimes cause column data types to change to object. Double-check!')
-            X = X.T.drop_duplicates().T
+        dup_cols = X.columns[X.columns.duplicated()]
+        ### Remember that the logic for columns is different. Don't change this line!
+        if len(dup_cols) > 0:
+            print(f'Alert: Dropping {len(dup_cols)} duplicate cols: {dup_cols}!')
+            ### DO NOT TOUCH THIS LINE!! IT TOOK A LONG TIME TO MAKE IT WORK!!
+            X = X.T[X.T.index.duplicated(keep='first')].T
         
         # Return the DataFrame with no duplicates
         return X
@@ -665,6 +703,9 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         float_cols = X.select_dtypes(include=["float"]).columns.tolist()
         non_float_cols = left_subtract(X.columns, float_cols)
+
+        ### First and foremost you must drop duplicate columns and rows
+        X = self.detect_duplicates(X)
 
         # Detect ID columns
         self.id_cols_ = [column for column in non_float_cols if X[column].nunique() == X.shape[0]]
@@ -764,6 +805,10 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
             X = pd.DataFrame(X)
+
+        # First find duplicate columns and rows
+        X = self.drop_duplicated(X)
+
         
         ### drop mixed data type columns from further processing ##
         if len(self.id_cols_) > 0:
@@ -792,8 +837,6 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
             if len(extra_cols) > 0:
                 X = X.drop(extra_cols, axis=1)
             
-        # find duplicate columns and rows
-        X = self.drop_duplicates(X)
         
         # Call the impute_missing function first and assign it to a new variable 
         imputed_X = self.impute_missing(X)
@@ -816,11 +859,142 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
                 
         # Return the transformed DataFrame
         return transformed_X
+################################################################################
+from IPython.display import display
+# Import BaseEstimator and TransformerMixin from sklearn
+from sklearn.base import BaseEstimator, TransformerMixin
+import copy
+class DataSchemaChecker(BaseEstimator, TransformerMixin):
+    """
+    A class to check if a pandas dataframe conforms to a given schema.
+
+    Attributes:
+        schema (dict): A dictionary that maps column names to data types.
+    
+    Example of a schema: all python dtypes must be surrounded by quote strings.
+    {'name': 'string',
+     'age': 'float32',
+     'gender': 'object',
+     'income': 'float64',
+     'target': 'integer'}
+
+    Methods:
+        fit(df): Checks if the dataframe matches the schema and prints a table of errors if any.
+    """
+    def __init__(self, schema):
+        """
+        Initializes the DataFrameSchemaChecker object with a schema.
+
+        Args:
+            schema (dict): A dictionary that maps column names to data types.
+            
+        Example of a schema: all python dtypes must be surrounded by quote strings.
+        {'name': 'string',
+         'age': 'float32',
+         'gender': 'object',
+         'income': 'float64',
+         'target': 'integer'}
+        """
+        self.schema = schema
+
+    def fit(self, df):
+        """
+        Checks if the dataframe matches the schema and prints a table of errors if any.
+
+        Args:
+            df (pd.DataFrame): The dataframe to be checked.
+
+        Raises:
+            ValueError: If the number of columns in the dataframe does not match the number of columns in the schema or if the schema contains an invalid data type.
+
+        Returns:
+            None
+        """
+        # Check if the number of columns in the dataframe matches the number of columns in the schema
+        if len(df.columns) != len(self.schema):
+            raise ValueError("The number of columns in the dataframe does not match the number of columns in the schema")
+
+        # Translate the schema to pandas dtypes
+        translated_schema = {}
+        for column, dtype in self.schema.items():
+            if dtype in ["string","object","category", "str"]:
+                translated_schema[column] = "object"
+            elif dtype in ["text","NLP","nlp"]:
+                translated_schema[column] = "object"
+            elif dtype in ["boolean","bool"]:
+                translated_schema[column] = "bool"
+            elif dtype in [ "np.int8", "np.int16", 
+                            "int8", "int16"]:
+                translated_schema[column] = "int16"
+            elif dtype in ["int32", "np.int32"]:
+                translated_schema[column] = "int32"
+            elif dtype in ["integer","int", "int64", "np.int64"]:
+                translated_schema[column] = "int64"
+            elif dtype in ["date"]:
+                translated_schema[column] = "datetime64[ns]"                
+            elif dtype in ["float"]:
+                translated_schema[column] = "float64"
+            elif dtype in ["np.float32", "float32"]: 
+                translated_schema[column] = "float32"
+            elif dtype in ["np.float64", "float64"]:
+                translated_schema[column] = "float64"
+            else:
+                raise ValueError("Invalid data type: {}".format(dtype))
+
+        # Check if the data types of the columns in the dataframe match the data types in the schema
+        errors = []
+        for column, dtype in translated_schema.items():
+            # Get the actual data type of the column
+            actual_dtype = df[column].dtype
+            # Compare with the expected data type
+            if actual_dtype != dtype:
+                # Append an error message to the list
+                errors.append({
+                    "column": column,
+                    "expected_dtype": dtype,
+                    "actual_dtype": actual_dtype,
+                    "data_dtype_mismatch": "Column '{}' has data type '{}' but expected '{}'".format(
+                        column, actual_dtype, dtype)})
+        
+        # Print a table of errors if there are any
+        if errors:
+            # Create a dataframe from the list of errors
+            self.error_df_ = pd.DataFrame(errors)
+            # Display the dataframe using IPython.display
+            display(self.error_df_)
+        else:
+            print("**No Data Schema Errors**")
+
+        return self
+            
+    def transform(self, df):
+        """
+        Transforms the dataframe dtype to the expected dtype if the dataframe has been fit with DataSchemaChecker
+
+        Args:
+            df (pd.DataFrame): The dataframe to be transformed using DataSchemaChecker's error_df_ variable.
+
+        Raises:
+            Error: If the datatype for a column cannot be transformed as requested.
+
+        Returns:
+            modified dataframe (df)
+        """        
+        df = copy.deepcopy(df)
+        if len(self.error_df_) > 0:
+            # Loop over the rows in the DataFrame.
+            for i, row in self.error_df_.iterrows():
+                column = row['column']
+                try:
+                    df[column] = df[column].astype(self.error_df_["expected_dtype"][0])
+                except:
+                    print(f"Converting {column} to {self.error_df_['expected_dtype'][0]} is erroring. Please convert it yourself.")
+                
+        return df
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.8'
+version_number =  '1.9'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest version.
-from pandas_dq import dq_report, Fix_DQ
 """)
 #################################################################################

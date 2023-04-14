@@ -17,21 +17,21 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 ## Introduction
 `pandas_dq` is a new python library for data quality analysis and improvement. It is fast, efficient and scalable. 
 
-<b>Alert!</b>>: If you are using `pandas version 2.0` ("the new pandas"), beware that weird errors are popping up in all kinds of libraries that use pandas underneath. Our `pandas_dq` library is no exception. So if you plan to use `pandas_dq` with `pandas version 2.0`, beware that you may see weird errors and we can't and won't fix them!
+<b>Alert!</b>: If you are using `pandas version 2.0` ("the new pandas"), beware that weird errors are popping up in all kinds of libraries that use pandas underneath. Our `pandas_dq` library is no exception. So if you plan to use `pandas_dq` with `pandas version 2.0`, beware that you may see weird errors and we can't and won't fix them!
 
 ### What is pandas_dq?
-`pandas_dq` is a new python library for automatically cleaning your dirty dataset using pandas scikit_learn functions. You can analyze your dataset and fix them - all in a single line of code!
+`pandas_dq` is a new python library for automatically cleaning your dirty dataset using pandas scikit_learn functions. You can analyze your dataset and fix them - all in a single line of code! Recent addition: pandas_dq can check your dataset data types against a specific schema.
 
 ![pandas_dq](./images/pandas_dq_logo.png)
 
 ## Uses
-`pandas_dq` has two important modules: `dq_report` and `Fix_DQ`. <br>
+`pandas_dq` has multiple important modules: `dq_report`, `Fix_DQ` and now `DataSchemeChecker`. <br>
 
 ### 1.  dq_report function
 
 ![dq_report_code](./images/find_dq_screenshot.png)
 
-<p>`dq_report` is a function that is the most popular way to use pandas_dq and it performs following data quality analysis steps:
+<p>`dq_report` prints a data quality report after it analyzes your dataset for the issues:
 <ol>
 <li>It detects ID columns</li>
 <li>It detects zero-variance columns </li>
@@ -71,9 +71,26 @@ Notice that for large datasets, this report generation may take time. So please 
 <li>It detects feature leakage and drops one of those features if they are highly correlated to target </li>
 </ol>
 
-
-###  How can we use Fix_DQ in GridSearchCV to find the best model pipeline?
+<b>How can we use Fix_DQ in GridSearchCV to find the best model pipeline?</b>
 <p>This is another way to find the best data cleaning steps for your train data and then use the cleaned data in hyper parameter tuning using GridSearchCV or RandomizedSearchCV along with a LightGBM or an XGBoost or a scikit-learn model.<br>
+
+### 3.  DataSchemaChecker class: a scikit_learn transformer that can check if a pandas dataframe conforms to a given schema and transform it.
+The class has two methods: fit and transform. You need to initialize the class with a schema that you want to compare your data's dtypes against. A schema is a dictionary that maps column names to data types. 
+
+```
+        Example of a schema: all python dtypes must be surrounded by quote strings.
+        {'name': 'string',
+         'age': 'float32',
+         'gender': 'object',
+         'income': 'float64',
+         'target': 'integer'}
+```
+
+The fit method takes a dataframe as an argument and checks if it matches the schema. The fit method first checks if the number of columns in the dataframe and the schema are equal. If not, it creates an exception. Finally, the fit method prints a table of exceptions it found in your data against the given schema. 
+
+The transform method takes a dataframe as n argument and based on the given schema and the exceptions, converts all the exception data columns to the given schema. If not, it skips the column and prints out an error message.
+
+![dq_ds](./images/data_schema_checker.png)
 
 ## Install
 <p>
