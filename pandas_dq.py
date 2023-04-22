@@ -923,8 +923,9 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
                 translated_schema[column] = "object"
             elif dtype in ["boolean","bool"]:
                 translated_schema[column] = "bool"
-            elif dtype in [ "np.int8", "np.int16", 
-                            "int8", "int16"]:
+            elif dtype in [ "np.int8", "int8"]:
+                translated_schema[column] = "int8"
+            elif dtype in ["np.int16","int16"]:
                 translated_schema[column] = "int16"
             elif dtype in ["int32", "np.int32"]:
                 translated_schema[column] = "int32"
@@ -982,11 +983,14 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
         """        
         df = copy.deepcopy(df)
         if len(self.error_df_) > 0:
-            # Loop over the rows in the DataFrame.
+            # Loop over only the error data types detected in the Error DataFrame.
             for i, row in self.error_df_.iterrows():
                 column = row['column']
                 try:
-                    df[column] = df[column].astype(self.error_df_["expected_dtype"][0])
+                    if row['expected_dtype']=='datetime64[ns]':
+                        df[column] = pd.to_datetime(df[column])
+                    else:
+                        df[column] = df[column].astype(row["expected_dtype"])
                 except:
                     print(f"Converting {column} to {self.error_df_['expected_dtype'][0]} is erroring. Please convert it yourself.")
                 
@@ -994,7 +998,7 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
 
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.9'
+version_number =  '1.10'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest version.
 """)
 #################################################################################
