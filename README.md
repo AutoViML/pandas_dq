@@ -35,13 +35,11 @@ Here are some of the benefits of using the pandas_dq library:
 - It can improve the quality of data analysis.
 - It can ensure that your results are reliable.
 - It is easy to use and can be integrated with other `pandas` tools.
-<ol>
 
 `pandas_dq` has three main modules:
 <li><b>dq_report</b>: This function displays a data quality report either inline or in HTML after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
 <li><b>Fix_DQ</b>: This class is a scikit-learn compatible transformer that can detect and fix data quality issues in one line of code. It can remove ID columns, zero-variance columns, rare categories, infinite values, mixed data types, outliers, high cardinality features, highly correlated features, duplicate rows and columns, skewed distributions and imbalanced classes.</li>
 <li><b>DataSchemaChecker</b>: This class can check your dataset data types against a specific schema and report any mismatches or errors.</li>
-</ol>
 
 `pandas_dq` is designed to provide you the cleanest features with the fewest steps.
 
