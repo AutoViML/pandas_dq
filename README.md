@@ -23,10 +23,10 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 The new `pandas_dq` library in Python is a great addition to the `pandas` ecosystem. It provides a set of tools for data quality assessment, which can be used to identify and address potential problems with data sets. This can help to improve the quality of data analysis and ensure that results are reliable.
 
 The `pandas_dq` library is still under development, but it already includes a number of useful features. These include:
-- Data profiling: This allows you to get an overview of the data, including features, their data types, their values, and distribution.
-- Data cleaning: This allows you to identify and remove errors and inconsistencies in the data.
-- Data imputation: This allows you to fill in missing values in the data.
-- Data transformation: This allows you to transform skewed features into a more normal-like distribution.
+- <b>Data profiling</b>: pandas_dq displays a report either in-line or in HTML to give you a quick overview of your data, including its features, feature types, their null and unique value percentages, their maximum and minimum values.
+- <b>Data cleaning</b>: pandas_dq allows you to quickly identify and remove data quality issues and inconsistencies in your data set.
+- <b>Data imputation</b>: pandas_dq allows you to fill missing values with your own choice of values for each feature in your data. For example, you can have one default for `age` feature and another for `income` feature.
+- <b>Data transformation</b>: pandas_dq allows you to transform skewed features into a more normal-like distribution.
 
 The `pandas_dq` library is a valuable tool for anyone who works with data. It can help you to improve the quality of your data analysis and ensure that your results are reliable.
 
@@ -38,7 +38,7 @@ Here are some of the benefits of using the pandas_dq library:
 <ol>
 
 `pandas_dq` has three main modules:
-<li><b>dq_report</b>: This function prints a data quality report after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
+<li><b>dq_report</b>: This function displays a data quality report either inline or in HTML after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
 <li><b>Fix_DQ</b>: This class is a scikit-learn compatible transformer that can detect and fix data quality issues in one line of code. It can remove ID columns, zero-variance columns, rare categories, infinite values, mixed data types, outliers, high cardinality features, highly correlated features, duplicate rows and columns, skewed distributions and imbalanced classes.</li>
 <li><b>DataSchemaChecker</b>: This class can check your dataset data types against a specific schema and report any mismatches or errors.</li>
 </ol>
@@ -54,7 +54,7 @@ Here are some of the benefits of using the pandas_dq library:
 
 ![dq_report_code](./images/find_dq_screenshot.png)
 
-<p>`dq_report` prints a data quality report after it analyzes your dataset looking for these issues:
+<p>`dq_report` displays a data quality report (inline or HTML) after it analyzes your dataset looking for these issues:
 <ol>
 <li>It detects ID columns</li>
 <li>It detects zero-variance columns </li>
@@ -100,9 +100,9 @@ Notice that for large datasets, this report generation may take time, hence we r
 ### 3.  DataSchemaChecker class: a scikit_learn transformer that can check whether a pandas dataframe conforms to a given schema and coerces the data to conform to it.
 The DataSchemaChecker class has two methods: fit and transform. You need to initialize the class with a schema that you want to compare your data's dtypes against. A schema is a dictionary that maps column names to data types. 
 
-The fit method takes a dataframe as an argument and checks if it matches the schema. The fit method first checks if the number of columns in the dataframe and the schema are equal. If not, it creates an exception. Finally, the fit method prints a table of exceptions it found in your data against the given schema. 
+The fit method takes a dataframe as an argument and checks if it matches the schema. The fit method first checks if the number of columns in the dataframe and the schema are equal. If not, it creates an exception. Finally, the fit method displays a table of exceptions it found in your data against the given schema. 
 
-The transform method takes a dataframe as an argument and based on the given schema and the exceptions, converts all the exception data columns to the given schema. If it is not able to transform the column, it skips the column and prints out an error message.
+The transform method takes a dataframe as an argument and based on the given schema and the exceptions, converts all the exception data columns to the given schema. If it is not able to transform the column, it skips the column and displays out an error message.
 
 ![dq_ds](./images/data_schema_checker.png)
 
@@ -134,14 +134,23 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-<p>
-You can invoke `Fix_DQ` as a scikit-learn compatible fit and transform object. See syntax below.<p>
+
+### To get a quick profile of your data, can simply call dq_report
+
+```
+from pandas_dq import dq_report
+dq_report(data, target=target, html=False, csv_engine="pandas", verbose=1)
+```
+
+It displays a data quality report like this inline or in HTML format (and it saves the HTML to your machine):
+
+![dq_report](./images/dq_report_screenshot.png)
+
+### To fix your data quality issues, use `Fix_DQ` as a scikit-learn compatible transformer<p>
 
 ```
 from pandas_dq import Fix_DQ
 
-# Call the transformer to print data quality issues 
-# as well as clean your data - all in one step
 # Create an instance of the fix_data_quality transformer with default parameters
 fdq = Fix_DQ()
 
@@ -153,29 +162,18 @@ X_test_transformed = fdq.transform(X_test)
 
 ```
 
-### if you are not using the Transformer, you can simply call the function, dq_report
+### To validate that your data conforms to a given schema, use DataSchemaChecker:
+
+Once you define the schema as below, you can use it as follows:
 
 ```
-from pandas_dq import dq_report
-dq_report(data, target=target, csv_engine="pandas", verbose=1)
+schema = {'name': 'string',
+        'age': 'float32',
+        'gender': 'object',
+        'income': 'float64',
+        'date': 'date',
+        'target': 'integer'}
 ```
-
-It prints out a data quality report like this:
-
-![dq_report](./images/dq_report_screenshot.png)
-
-### If you are using the DataSchemaChecker class, you can try it with a schema like this:
-
-```
-        Example of a schema: all python dtypes must be surrounded by quote strings.
-        schema = {'name': 'string',
-         'age': 'float32',
-         'gender': 'object',
-         'income': 'float64',
-         'target': 'integer'}
-```
-
-Once you define the schema above, you can use it as follows:
 
 ```
 from pandas_dq import DataSchemaChecker
@@ -192,16 +190,19 @@ pandas_dq has a very simple API with one major goal: find data quality issues in
 
 **Arguments**
 
-`dq_report` has only 4 arguments:<br>
+### `dq_report` has the following arguments:<br>
 <b>Caution:</b> For very large data sets, we randomly sample 100K rows from your CSV file to speed up reporting. If you want a larger sample, simply read in your file offline into a pandas dataframe and send it in as input, and we will load it as it is. This is one way to go around our speed limitations.
 - `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file. 
 - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
+- `html`: default is `False`. If you want to display your report in HTML in a browser, set it to `True`. Otherwise, it defaults to inline in a notebook or prints on the terminal. It also saves the HTML file in your working directory in your machine.
 - `csv_engine`: default is `pandas`. If you want to load your CSV file using any other backend engine such as `arrow` or `parquet` please specify it here. This option only impacts CSV files.
 - `verbose`: This has 2 possible states:
-  - `0` summary report. Prints only the summary level data quality issues in the dataset. Great for managers.
-  - `1` detailed report. Prints all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
+  - `0` summary report. displays only the summary level data quality issues in the dataset. Great for managers.
+  - `1` detailed report. displays all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
 
-`Fix_DQ` has slightly more arguments:<br>
+`dq_report` returns a dataframe containing all the data quality issues in your data.
+
+### `Fix_DQ` has the following arguments:<br>
 <b>Caution:</b> X_train and y_train in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
 
 - `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.
@@ -210,23 +211,13 @@ pandas_dq has a very simple API with one major goal: find data quality issues in
 - `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less than say 5% (0.05) of samples, then it will be considered rare. All rare categories in that column will be merged under a new category named "Rare". 
 - `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, if two variables are correlated, one of them will be dropped. The program will tell you which variable is being dropped. You can switch the sequence of variables in your dataset if you want the one or other dropped.<br>
 
-`DataSchemaChecker` is very similar in that it is also a scikit-learn transformer. It checks you data against a given schema:<br>
+### `DataSchemaChecker` is very similar in that it is also a scikit-learn transformer. It checks you data against a given schema:<br>
 What is a schema?
   `A schema (dict) is a dictionary that maps column names to data types.`
 
-For Example: here is a schema with column names against their expected python dtypes (being surrounded by quote strings).
-
-```
-{'name': 'string',
-  'age': 'float32',
-  'gender': 'object',
-  'income': 'float64',
-  'target': 'integer'}
-```
-
 DataSchemaChecker has two methods:
-- `fit` method: Checks if the dataframe matches the schema and prints a table of errors if any.
-- `transform` method: Transforms the dataframe's dtypes to the given schema and prints errors if any.
+- `fit` method: Checks if the dataframe matches the schema and displays a table of errors if any.
+- `transform` method: Transforms the dataframe's dtypes to the given schema and displays errors if any.
 
 ## Maintainers
 
