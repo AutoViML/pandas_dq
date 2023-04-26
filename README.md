@@ -139,7 +139,7 @@ pip install -r requirements.txt
 
 ```
 from pandas_dq import dq_report
-dq_report(data, target=target, html=False, csv_engine="pandas", verbose=1)
+dqr = dq_report(data, target=target, html=False, csv_engine="pandas", verbose=1)
 ```
 
 It displays a data quality report like this inline or in HTML format (and it saves the HTML to your machine):
