@@ -61,6 +61,10 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     Finally, the function identifies if the problem is a classification problem or
      a regression problem and checks if there is class imbalanced or target leakage in the dataset.
     """
+    NEW_COLUMN_WIDTH = 500
+    # change the maximum column width in pandas
+    pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
+
     if not verbose:
         print("This is a summary report. Change verbose to 1 to see more details on each DQ issue.")
     #### If sometimes, target is given as empty string, change it to None
@@ -192,7 +196,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     
     #### This is the first thing you need to do ###############
     if dup_rows > 0:
-        new_string =  f"There are {dup_rows} duplicate columns in the dataset. Keep only one copy of them."
+        new_string =  f"There are {dup_rows} duplicate rows in the dataset. De-Dup them using Fix_DQ."
         dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
         dq_df1.loc[bad_col,'first_comma'] = ', '
     else:
@@ -201,7 +205,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
         dq_df1.loc[good_col,'first_comma'] = ', '
     ### DO NOT CHANGE THE NEXT LINE. The logic for columns is different. 
     if len(dup_cols) > 0:
-        new_string =  f"There are {len(dup_cols)} duplicate columns in the dataset. Keep only one copy of {dup_cols}."
+        new_string =  f"There are {len(dup_cols)} duplicate columns in the dataset. De-Dup {dup_cols} using Fix_DQ."
         dq_df1.loc[bad_col,new_col] += dq_df1.loc[bad_col,'first_comma'] + new_string
         dq_df1.loc[bad_col,'first_comma'] = ', '
     else:
@@ -753,7 +757,11 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
     
     # Define the fit method that calculates the upper bound for each numerical column
     def fit(self, X, y=None):
+        NEW_COLUMN_WIDTH = 500
+        # change the maximum column width in pandas
+        pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
         # Check if X is a pandas DataFrame
+        
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
             X = pd.DataFrame(X)
@@ -969,6 +977,10 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
         Returns:
             None
         """
+        NEW_COLUMN_WIDTH = 500
+        # change the maximum column width in pandas
+        pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
+
         # Check if the number of columns in the dataframe matches the number of columns in the schema
         if len(df.columns) != len(self.schema):
             raise ValueError("The number of columns in the dataframe does not match the number of columns in the schema")
@@ -1090,6 +1102,10 @@ def dc_report(train, test, html=False, verbose=0):
     ValueError
         If the input are not pandas dataframes or if the two dataframes do not have the same columns.
     """
+    NEW_COLUMN_WIDTH = 500
+    # change the maximum column width in pandas
+    pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
+
     # Check if the input are pandas dataframes
     if not isinstance(train, pd.DataFrame) or not isinstance(test, pd.DataFrame):
         print("The input must be pandas dataframes. Stopping!")
@@ -1182,7 +1198,7 @@ def dc_report(train, test, html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.20'
+version_number =  '1.21'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
