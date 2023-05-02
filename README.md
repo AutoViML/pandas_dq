@@ -24,6 +24,7 @@ The new `pandas_dq` library in Python is a great addition to the `pandas` ecosys
 
 The `pandas_dq` library is still under development, but it already includes a number of useful features. These include:
 - <b>Data profiling</b>: pandas_dq displays a report either in-line or in HTML to give you a quick overview of your data, including its features, feature types, their null and unique value percentages, their maximum and minimum values.
+- <b>Train Test comparison</b>: pandas_dq displays a comparison report either in-line or in HTML to give you a quick comparison of your train and test dataasets, including their distributional differences (using the KS Test), and comparing their null and unique value percentages.
 - <b>Data cleaning</b>: pandas_dq allows you to quickly identify and remove data quality issues and inconsistencies in your data set.
 - <b>Data imputation</b>: pandas_dq allows you to fill missing values with your own choice of values for each feature in your data. For example, you can have one default for `age` feature and another for `income` feature.
 - <b>Data transformation</b>: pandas_dq allows you to transform skewed features into a more normal-like distribution.
@@ -36,8 +37,9 @@ Here are some of the benefits of using the pandas_dq library:
 - It can ensure that your results are reliable.
 - It is easy to use and can be integrated with other `pandas` tools.
 
-`pandas_dq` has three main modules:
-<li><b>dq_report</b>: This function displays a data quality report either inline or in HTML after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
+`pandas_dq` has the following main modules:
+<li><b>dq_report</b>: The data quality report displays a data quality report either inline or in HTML after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
+<li><b>dc_report</b>: The data comparison report displays a comparison report between train and test datasets either inline or in HTML after it analyzes both datasets for various issues, such as missing values, unique values, min and max, etc. It also checks provides a Statistical Test (KS test) to compare the distribitional differences of numeric features to detect data drift.</li>
 <li><b>Fix_DQ</b>: This class is a scikit-learn compatible transformer that can detect and fix data quality issues in one line of code. It can remove ID columns, zero-variance columns, rare categories, infinite values, mixed data types, outliers, high cardinality features, highly correlated features, duplicate rows and columns, skewed distributions and imbalanced classes.</li>
 <li><b>DataSchemaChecker</b>: This class can check your dataset data types against a specific schema and report any mismatches or errors.</li>
 
@@ -70,7 +72,20 @@ Here are some of the benefits of using the pandas_dq library:
 </ol>
 Notice that for large datasets, this report generation may take time, hence we read a 100K sample from your CSV file. If you want us to read the whole data, then send it in as a dataframe.
 
-### 2.  Fix_DQ class: a scikit_learn transformer which can detect data quality issues and fix them all in one line of code
+### 2.  dc_report function
+
+![dc_report_code](./images/dc_report.png)
+
+`dc_report` is a data comparison tool that accepts two pandas dataframes as input and returns a report highlighting any differences between them. For example:
+<ol>
+<li>The function uses our function `dqr = dq_report(df)` to generate a data quality report for each dataframe and compares the results using the column names from the report.</li>
+<li>It also computes the Kolmogorov-Smirnov test statistic to measure the distribution difference for numeric columns with low cardinality.</li>
+<li>It also compares the Missing Values% and Unique Values% between the two dataframes and adds a comment in the "Distribution Difference" column if the two percentages are different.</li>
+<li>It returns a dataframe with the following column names: Column Name, Data Type Train, Data Type Test, Missing Values% Train, Missing Values% Test, Unique Values% Train, Unique Values% Test, Minimum Value Train, Minimum Value Test, Maximum Value Train, Maximum Value Test, DQ Issue Train, DQ Issue Test, Distribution Difference.</li>
+- Notice that for large datasets, this report generation may take time. So make sure you take a sample of your train and test data before calling this report!
+</ol>
+
+### 3.  Fix_DQ class: a scikit_learn transformer which can detect data quality issues and fix them all in one line of code
 
 ![fix_dq](./images/fix_dq_screenshot.png)
 
@@ -95,7 +110,7 @@ Notice that for large datasets, this report generation may take time, hence we r
 <b>How can we use Fix_DQ in GridSearchCV to find the best model pipeline?</b>
 <p>This is another way to find the best data cleaning steps for your train data and then use the cleaned data in hyper parameter tuning using GridSearchCV or RandomizedSearchCV along with a LightGBM or an XGBoost or a scikit-learn model.<br>
 
-### 3.  DataSchemaChecker class: a scikit_learn transformer that can check whether a pandas dataframe conforms to a given schema and coerces the data to conform to it.
+### 4.  DataSchemaChecker class: a scikit_learn transformer that can check whether a pandas dataframe conforms to a given schema and coerces the data to conform to it.
 The DataSchemaChecker class has two methods: fit and transform. You need to initialize the class with a schema that you want to compare your data's dtypes against. A schema is a dictionary that maps column names to data types. 
 
 The fit method takes a dataframe as an argument and checks if it matches the schema. The fit method first checks if the number of columns in the dataframe and the schema are equal. If not, it creates an exception. Finally, the fit method displays a table of exceptions it found in your data against the given schema. 
@@ -143,6 +158,15 @@ dqr = dq_report(data, target=target, html=False, csv_engine="pandas", verbose=1)
 It displays a data quality report like this inline or in HTML format (and it saves the HTML to your machine):
 
 ![dq_report](./images/dq_report_screenshot.png)
+
+To get a quick comparison of two sets of similar data,  simply call dc_report: a data comparison tool that accepts two pandas dataframes as input and returns a report highlighting any differences between them. It can also provide a report in HTML format as below.
+
+```
+from pandas_dq import dc_report
+dc_report = dc_report(train, test, html=True, verbose=1)
+```
+
+![dc_report_screenshot](./images/dc_report_screenshot.png)
 
 ### To fix your data quality issues, use `Fix_DQ` as a scikit-learn compatible transformer<p>
 

@@ -63,6 +63,10 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     """
     if not verbose:
         print("This is a summary report. Change verbose to 1 to see more details on each DQ issue.")
+    #### If sometimes, target is given as empty string, change it to None
+    if isinstance(target, str):
+        if target == '':
+            target = None        
     # Check if the input is a string or a dataframe
     if isinstance(data, str):
         # Get the file extension
@@ -453,13 +457,15 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
 
     if html:
         if verbose == 0:
-            write_to_html(dq_df1)
+            write_to_html(dq_df1, "dq_report.html")
         else:
-            write_to_html(dq_df2)
+            write_to_html(dq_df2, "dq_report.html")
     else:
         from IPython.display import display
 
-        if verbose == 0:
+        if verbose == -1:
+            pass
+        elif verbose == 0:
             all_rows = dq_df1.shape[0]
             ax = dq_df1.head(all_rows).style.background_gradient(cmap='Reds').set_properties(**{'font-family': 'Segoe UI'})
             display(ax);
@@ -474,7 +480,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
 import re
 # Import the webbrowser module
 import webbrowser
-def write_to_html(dqr):
+def write_to_html(dqr, filename="dq_report.html"):
     """
     Write a data quality report to an HTML file and open it in a browser.
 
@@ -513,11 +519,11 @@ def write_to_html(dqr):
     /* Set the background color for every even row */ tr:nth-child(even) {{ background-color: lightgrey; }} </style> {df_html} """
 
     # Return the HTML code of the report as a string
-    with open("dq_report.html", "w") as f:
+    with open(filename, "w") as f:
         f.write(df_html)
 
     # Open the file in a new tab of the default browser
-    webbrowser.open_new_tab("dq_report.html")
+    webbrowser.open_new_tab(filename)
 
 ##################################################################################################
 # Import pandas and numpy libraries
@@ -1048,10 +1054,135 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
                     print(f"Converting {column} to {self.error_df_['expected_dtype'][0]} is erroring. Please convert it yourself.")
                 
         return df
+###################################################################################
+from scipy.stats import ks_2samp
 
+def dc_report(train, test, html=False, verbose=0):
+    """
+    This is a data comparison tool that accepts two pandas dataframes as input and 
+    returns a report highlighting any differences between them.
+    
+    Parameters
+    ----------
+    train : pd.DataFrame
+        The training dataframe to be compared.
+    test : pd.DataFrame
+        The testing dataframe to be compared.
+    verbose : 0 or 1
+        If 1, Provides a longer report detailing all the columns mentioned in the report output below.
+        If 0, Provides only a shorter report with Column Name, DQ Issue Train, DQ Issue Test and Distribution Difference.
+    
+    Returns
+    -------
+    report : pd.DataFrame
+        A dataframe with the following column names: Column Name, Data Type Train, 
+        Data Type Test, Missing Values% Train, Missing Values% Test, Unique Values% Train, 
+        Unique Values% Test, Minimum Value Train, Minimum Value Test, 
+        Maximum Value Train, Maximum Value Test, DQ Issue Train, DQ Issue Test, 
+        Distribution Difference.
+        The Distribution Difference column contains comments on any differences between 
+        the two dataframes based on the Kolmogorov-Smirnov test statistic for numeric 
+        columns with low cardinality, and the percentage of missing values and 
+        unique values for all columns.
+    
+    Raises
+    ------
+    ValueError
+        If the input are not pandas dataframes or if the two dataframes do not have the same columns.
+    """
+    # Check if the input are pandas dataframes
+    if not isinstance(train, pd.DataFrame) or not isinstance(test, pd.DataFrame):
+        print("The input must be pandas dataframes. Stopping!")
+        return pd.DataFrame()
+    # Check if the two dataframes have the same columns
+    if not train.columns.equals(test.columns):
+        print("The two dataframes dont have the same columns. Cannot be compared!")
+        return pd.DataFrame()
+    
+    # Use your function dqr = dq_report(df) to generate a data quality report for each dataframe
+    dqr_train = dq_report(train, verbose=-1)
+    dqr_train = dqr_train.reset_index().rename(columns={'index':"Column Name"})
+    dqr_test = dq_report(test,verbose = -1)
+    dqr_test = dqr_test.reset_index().rename(columns={'index':"Column Name"})
+    
+    # Merge the two reports on the column name
+    report = pd.merge(dqr_train, dqr_test, on="Column Name", suffixes=("_Train", "_Test"))
+    
+    # Initialize an empty list to store the distribution difference results
+    dist_diff = []
+    
+    # Loop through each column in the dataframes
+    for col in train.columns:
+        # Get the data type of the column in each dataframe
+        dtype_train = train[col].dtype
+        dtype_test = test[col].dtype
+        
+        # Get the percentage of missing values in each dataframe
+        missing_train = train[col].isna().mean() * 100
+        missing_test = test[col].isna().mean() * 100
+        
+        # Get the percentage of unique values in each dataframe
+        unique_train = train[col].nunique() / len(train) * 100
+        unique_test = test[col].nunique() / len(test) * 100
+        
+        # Initialize an empty string to store the distribution difference comments for the current column
+        dist_diff_col = ""
+        
+        # If the column is numeric and has low cardinality, get the minimum and maximum values from the report dataframe
+        if np.issubdtype(dtype_train, np.number) and np.issubdtype(dtype_test, np.number) and unique_train < 10 and unique_test < 10:
+            min_train = report.loc[report["Column Name"] == col, "Minimum Value_Train"].values[0]
+            min_test = report.loc[report["Column Name"] == col, "Minimum Value_Test"].values[0]
+            max_train = report.loc[report["Column Name"] == col, "Maximum Value_Train"].values[0]
+            max_test = report.loc[report["Column Name"] == col, "Maximum Value_Test"].values[0]
+            
+            # If the column is not missing in both dataframes, compute the Kolmogorov-Smirnov test statistic to measure the distribution difference
+            if missing_train < 100 and missing_test < 100:
+                ks_stat = ks_2samp(train[col].dropna(), test[col].dropna()).statistic
+                
+                # If the test statistic is greater than zero, add a comment to indicate that there is a distribution difference
+                if ks_stat > 0:
+                    dist_diff_col += f"The distributions of {col} are different with a KS test statistic of {ks_stat:.3f}. "
+        
+        # If the percentage of missing values are different between the two dataframes, add a comment to indicate that there is a missing value difference
+        if missing_train != missing_test:
+            dist_diff_col += f"The percentage of missing values of {col} are different between train ({missing_train:.2f}%) and test ({missing_test:.2f}%). "
+
+        # If the percentage of unique values are different between the two dataframes, add a comment to indicate that there is a unique value difference
+        if unique_train != unique_test:
+            dist_diff_col += f"The percentage of unique values of {col} are different between train ({unique_train:.2f}%) and test ({unique_test:.2f}%). "
+        
+        # If the distribution difference comments are empty, set it to None
+        if dist_diff_col == "":
+            dist_diff_col = None
+        
+        # Append the distribution difference comments for the current column to the dist_diff list
+        dist_diff.append(dist_diff_col)
+    
+    # Add a new column to the report dataframe with the distribution difference results
+    report["Distribution Difference"] = dist_diff
+
+    if verbose:
+        if html:
+            write_to_html(report, filename="dc_report.html")
+        else:
+            # Return the report dataframe
+            all_rows = report.shape[0]
+            ax = report.head(all_rows).style.background_gradient(cmap='Reds').set_properties(**{'font-family': 'Segoe UI'})
+            display(ax);
+        return report
+    else:
+        short_report = report[['Column Name','DQ Issue_Train','DQ Issue_Test',"Distribution Difference"]]
+        if html:
+            write_to_html(short_report, filename="dc_report.html")
+        else:
+            # Return a shorter version of the dataframe
+            all_rows = short_report.shape[0]
+            ax = short_report.head(all_rows).style.background_gradient(cmap='Reds').set_properties(**{'font-family': 'Segoe UI'})
+            display(ax);
+        return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.12'
+version_number =  '1.20'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
