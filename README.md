@@ -1,9 +1,12 @@
 # pandas_dq
-Analyze and clean your data in a single line of code with a Scikit-Learn compatible Transformer.
+`pandas-dq` is the ultimate data quality toolkit for pandas dataframes.
+
+![pandas_dq](./images/pandas_dq_logo.png)
 
 # Table of Contents
 <ul>
 <li><a href="#introduction">What is pandas_dq</a></li>
+<li><a href="#Components">What are its main components</a></li>
 <li><a href="#uses">How to use pandas_dq</a></li>
 <li><a href="#install">How to install pandas_dq</a></li>
 <li><a href="#usage">Usage</a></li>
@@ -15,11 +18,12 @@ Analyze and clean your data in a single line of code with a Scikit-Learn compati
 <p>
 
 ## Introduction
-`pandas_dq` is a new python library for data quality analysis and improvement. It is fast, efficient and scalable. 
+`pandas_dq` is a new python library for data quality analysis and improvement. It is fast, efficient and scalable. `pandas-dq` is:
+- A smart and simple way to clean and improve your pandas dataframes.
+- A powerful way to boost your data analysis with high-quality pandas dataframes.
+- A powerful and flexible library for data quality management in pandas.
 
-<b>Alert!</b>: If you are using `pandas version 2.0` ("the new pandas"), beware that weird errors are popping up in all kinds of libraries that use pandas underneath. Our `pandas_dq` library is no exception. So if you plan to use `pandas_dq` with `pandas version 2.0`, beware that you may see weird errors and we can't and won't fix them!
-
-### What is pandas_dq?
+### Data quality made easy with pandas and scikit-learn transformers
 The new `pandas_dq` library in Python is a great addition to the `pandas` ecosystem. It provides a set of tools for data quality assessment, which can be used to identify and address potential problems with data sets. This can help to improve the quality of data analysis and ensure that results are reliable.
 
 The `pandas_dq` library is still under development, but it already includes a number of useful features. These include:
@@ -32,20 +36,21 @@ The `pandas_dq` library is still under development, but it already includes a nu
 The `pandas_dq` library is a valuable tool for anyone who works with data. It can help you to improve the quality of your data analysis and ensure that your results are reliable.
 
 Here are some of the benefits of using the pandas_dq library:
-- It can help you to identify and address potential problems with data sets.
-- It can improve the quality of data analysis.
-- It can ensure that your results are reliable.
-- It is easy to use and can be integrated with other `pandas` tools.
+- It can help you to identify and address potential problems with data sets before modeling.
+- It can fix data quality issues and improve the quality of your data.
+- It is easy to use and can be integrated with other `scikit-learn` pipelines.
+
+<b>Alert!</b>: If you are using `pandas version 2.0` ("the new pandas"), beware that weird errors are popping up in all kinds of libraries that use pandas underneath. Our `pandas_dq` library is no exception. So if you plan to use `pandas_dq` with `pandas version 2.0`, beware that you may see weird errors and we can't and won't fix them!
+
+## Components
 
 `pandas_dq` has the following main modules:
 <li><b>dq_report</b>: The data quality report displays a data quality report either inline or in HTML after it analyzes your dataset for various issues, such as missing values, outliers, duplicates, correlations, etc. It also checks the relationship between the features and the target variable (if provided) to detect data leakage.</li>
-<li><b>dc_report</b>: The data comparison report displays a comparison report between train and test datasets either inline or in HTML after it analyzes both datasets for various issues, such as missing values, unique values, min and max, etc. It also checks provides a Statistical Test (KS test) to compare the distribitional differences of numeric features to detect data drift.</li>
+<li><b>dc_report</b>: The data comparison report displays a comparison report between train and test datasets either inline or in HTML after it analyzes both datasets for various issues, such as missing values, unique values, min and max, etc. It also checks provides a Statistical Test (KS test) to compare the distribitional differences of numeric features to detect data drift. You can exclude target column(s) from comparison between train and test.</li>
 <li><b>Fix_DQ</b>: This class is a scikit-learn compatible transformer that can detect and fix data quality issues in one line of code. It can remove ID columns, zero-variance columns, rare categories, infinite values, mixed data types, outliers, high cardinality features, highly correlated features, duplicate rows and columns, skewed distributions and imbalanced classes.</li>
 <li><b>DataSchemaChecker</b>: This class can check your dataset data types against a specific schema and report any mismatches or errors.</li>
 
 `pandas_dq` is designed to provide you the cleanest features with the fewest steps.
-
-![pandas_dq](./images/pandas_dq_logo.png)
 
 ## Uses
 `pandas_dq` has multiple important modules: `dq_report`, `Fix_DQ` and now `DataSchemaChecker`. <br>
@@ -81,7 +86,7 @@ Notice that for large datasets, this report generation may take time, hence we r
 <li>The function uses our function `dqr = dq_report(df)` to generate a data quality report for each dataframe and compares the results using the column names from the report.</li>
 <li>It also computes the Kolmogorov-Smirnov test statistic to measure the distribution difference for numeric columns with low cardinality.</li>
 <li>It also compares the Missing Values% and Unique Values% between the two dataframes and adds a comment in the "Distribution Difference" column if the two percentages are different.</li>
-<li>It returns a dataframe with the following column names: Column Name, Data Type Train, Data Type Test, Missing Values% Train, Missing Values% Test, Unique Values% Train, Unique Values% Test, Minimum Value Train, Minimum Value Test, Maximum Value Train, Maximum Value Test, DQ Issue Train, DQ Issue Test, Distribution Difference.</li>
+<li>You can exclude target column(s) from comparison between train and test.</li>
 - Notice that for large datasets, this report generation may take time. So make sure you take a sample of your train and test data before calling this report!
 </ol>
 
@@ -159,11 +164,12 @@ It displays a data quality report like this inline or in HTML format (and it sav
 
 ![dq_report](./images/dq_report_screenshot.png)
 
-To get a quick comparison of two sets of similar data,  simply call dc_report: a data comparison tool that accepts two pandas dataframes as input and returns a report highlighting any differences between them. It can also provide a report in HTML format as below.
+### To get a quick comparison of two sets of data frames,  simply call dc_report
+`dc_report` is data comparison tool that accepts two pandas dataframes as input and returns a report highlighting any differences between them. It can also provide a report in HTML format as below.
 
 ```
 from pandas_dq import dc_report
-dc_report = dc_report(train, test, html=True, verbose=1)
+dc_report = dc_report(train, test, exclude=[], html=True, verbose=1)
 ```
 
 ![dc_report_screenshot](./images/dc_report_screenshot.png)
@@ -213,7 +219,9 @@ pandas_dq has a very simple API with one major goal: find data quality issues in
 **Arguments**
 
 ### `dq_report` has the following arguments:<br>
-<b>Caution:</b> For very large data sets, we randomly sample 100K rows from your CSV file to speed up reporting. If you want a larger sample, simply read in your file offline into a pandas dataframe and send it in as input, and we will load it as it is. This is one way to go around our speed limitations.
+<b>Caution:</b> For very large data sets, we randomly sample 100K rows from your CSV file to speed up reporting. If you want a larger sample, simply read in your file offline into a pandas dataframe and send it in as input, and we will load it as it is. This is one way to go around our speed limitations:
+
+#### Inputs:
 - `data`: You can provide any kind of file format (string) or even a pandas DataFrame (df). It reads parquet, csv, feather, arrow, all kinds of file formats straight from disk. You just have to tell it the path to the file and the name of the file. 
 - `target`: default: `None`. Otherwise, it should be a string name representing the name of a column in df. You can leave it as `None` if you don't want any target related issues.
 - `html`: default is `False`. If you want to display your report in HTML in a browser, set it to `True`. Otherwise, it defaults to inline in a notebook or prints on the terminal. It also saves the HTML file in your working directory in your machine.
@@ -221,25 +229,39 @@ pandas_dq has a very simple API with one major goal: find data quality issues in
 - `verbose`: This has 2 possible states:
   - `0` summary report. displays only the summary level data quality issues in the dataset. Great for managers.
   - `1` detailed report. displays all the gory details behind each DQ issue in your dataset and what to do about them. Great for engineers.
+#### Outputs:
+- `dataframe`: If verbose=1, it returns a dataframe with detailed data quality issues with your data. If verbose=0, it returns with a dataframe containing only the highlights of the data quality issues.
 
-`dq_report` returns a dataframe containing all the data quality issues in your data.
+`dc_report` returns a dataframe highlighting differences between two dataframes, typically train and test. It has the following inputs and outputs:
+#### Inputs:
+- `train`: a dataframe
+- `test`: a dataframe 
+- `exclude`: an empty list or a list of columns that you want to exclude from comparison in both dataframes
+- `html`: return a HTML file containing the differences between the two dataframes
+- `verbose`: 0 will return just the highlights of differences. 1 will return a detailed description of differences between the two dataframes.
 
-### `Fix_DQ` has the following arguments:<br>
-<b>Caution:</b> X_train and y_train in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
+#### Outputs:
+- `dataframe`: If verbose=1, it returns a dataframe with the following column names: Column Name, Data Type Train, Data Type Test, Missing Values% Train, Missing Values% Test, Unique Values% Train, Unique Values% Test, Minimum Value Train, Minimum Value Test, Maximum Value Train, Maximum Value Test, DQ Issue Train, DQ Issue Test, Distribution Difference. If verbose=0, it will return only the following columns: Column Name, DQ Issue Train, DQ Issue Test, Distribution Difference.
 
+### `Fix_DQ` is a scikit-learn transformer. It finds and fixes data quality issues in your data<br>
+<b>Caution:</b> X_train and X_test in Fix_DQ must be pandas Dataframes or pandas Series. I have not tested it on numpy arrays. You can try your luck.
+
+#### Inputs:
+- `X_train` : a pandas dataframe
+- `X_test` : a pandas dataframe
 - `quantile`: float (0.75): Define a threshold for IQR for outlier detection. Could be any float between 0 and 1. If quantile is set to `None`, then no outlier detection will take place.
 - `cat_fill_value`: string ("missing") or a dictionary: Define a fill value for missing categories in your object or categorical variables. This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
 - `num_fill_value`: integer (99) or float value (999.0) or a dictionary: Define a fill value for missing numbers in your integer or float variables.  This is a global default for your entire dataset. You can also give a dictionary where you specify different fill values for different columns.
 - `rare_threshold`: float (0.05):  Define a threshold for rare categories. If a certain category in a column is less than say 5% (0.05) of samples, then it will be considered rare. All rare categories in that column will be merged under a new category named "Rare". 
 - `correlation_threshold`: float (0.8): Define a correlation limit. Anything above this limit, if two variables are correlated, one of them will be dropped. The program will tell you which variable is being dropped. You can switch the sequence of variables in your dataset if you want the one or other dropped.<br>
 
-### `DataSchemaChecker` is very similar in that it is also a scikit-learn transformer. It checks you data against a given schema:<br>
-What is a schema?
-  `A schema (dict) is a dictionary that maps column names to data types.`
+### `DataSchemaChecker` is a scikit-learn transformer. It checks you data against a given schema<br>
+#### Inputs:
+- `schema`: dictionary. A schema (dict) is a dictionary that maps column names to data types. This schema will determine the data types of whatever dataframe you want to comply with.
 
 DataSchemaChecker has two methods:
-- `fit` method: Checks if the dataframe matches the schema and displays a table of errors if any.
-- `transform` method: Transforms the dataframe's dtypes to the given schema and displays errors if any.
+- `fit` method: Checks if the given dataframe matches the schema and displays a table of errors if any.
+- `transform` method: Transforms the given dataframe's dtypes to the given schema and displays errors if any.
 
 ## Maintainers
 

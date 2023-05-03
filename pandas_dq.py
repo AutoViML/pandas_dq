@@ -43,6 +43,10 @@ import pandas as pd
 import numpy as np
 import copy
 import os
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.max_colwidth', 1000)
+pd.set_option('colheader_justify', 'center')
 # Define a function to print a data quality report and suggestions to clean data
 def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     """
@@ -757,9 +761,6 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
     
     # Define the fit method that calculates the upper bound for each numerical column
     def fit(self, X, y=None):
-        NEW_COLUMN_WIDTH = 500
-        # change the maximum column width in pandas
-        pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
         # Check if X is a pandas DataFrame
         
         if not isinstance(X, pd.DataFrame):
@@ -977,10 +978,6 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
         Returns:
             None
         """
-        NEW_COLUMN_WIDTH = 500
-        # change the maximum column width in pandas
-        pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
-
         # Check if the number of columns in the dataframe matches the number of columns in the schema
         if len(df.columns) != len(self.schema):
             raise ValueError("The number of columns in the dataframe does not match the number of columns in the schema")
@@ -1069,10 +1066,12 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
 ###################################################################################
 from scipy.stats import ks_2samp
 
-def dc_report(train, test, html=False, verbose=0):
+def dc_report(train, test, exclude=[], html=False, verbose=0):
     """
     This is a data comparison tool that accepts two pandas dataframes as input and 
-    returns a report highlighting any differences between them.
+    returns a report highlighting any differences between them. You can exclude
+    certain columns from this comparison (such as target column) by using
+    the "exclude" argument.
     
     Parameters
     ----------
@@ -1080,6 +1079,12 @@ def dc_report(train, test, html=False, verbose=0):
         The training dataframe to be compared.
     test : pd.DataFrame
         The testing dataframe to be compared.
+    html : False
+        You can set it to True to receive an HTML report as well as a file saved in your
+        working directory.
+    exclude : []
+        You can exclude an columns from comparison such as target column which is in train
+        but not in test so that the comparison can be 1:1 between the dataframes.
     verbose : 0 or 1
         If 1, Provides a longer report detailing all the columns mentioned in the report output below.
         If 0, Provides only a shorter report with Column Name, DQ Issue Train, DQ Issue Test and Distribution Difference.
@@ -1100,19 +1105,28 @@ def dc_report(train, test, html=False, verbose=0):
     Raises
     ------
     ValueError
-        If the input are not pandas dataframes or if the two dataframes do not have the same columns.
+        If the input are not pandas dataframes or if the two dataframes do not have the same columns
+        except for the exclude list of columns.
     """
-    NEW_COLUMN_WIDTH = 500
-    # change the maximum column width in pandas
-    pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
+    train = copy.deepcopy(train)
+    test = copy.deepcopy(test)
 
     # Check if the input are pandas dataframes
     if not isinstance(train, pd.DataFrame) or not isinstance(test, pd.DataFrame):
         print("The input must be pandas dataframes. Stopping!")
         return pd.DataFrame()
+
+    ### drop the columns from each 
+    if len(exclude) > 0:
+        for each in exclude:
+            if each in train.columns:
+                train = train.drop(each, axis=1)
+            if each in test.columns:
+                test = test.drop(each, axis=1)
+
     # Check if the two dataframes have the same columns
     if not train.columns.equals(test.columns):
-        print("The two dataframes dont have the same columns. Cannot be compared!")
+        print("The two dataframes dont have the same columns. Use exclude argument to exclude columns from comparison.")
         return pd.DataFrame()
     
     # Use your function dqr = dq_report(df) to generate a data quality report for each dataframe
