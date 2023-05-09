@@ -260,7 +260,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     
 
     # Identify rare categories and suggests to group them into a single category or drop them123
-    rare_threshold = 0.05 # Define a threshold for rare categories
+    rare_threshold = 0.01 # Define a 1% threshold for rare categories
     cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist() # Get categorical columns
     rare_cat_cols = []
     if len(cat_cols) > 0:
@@ -599,7 +599,7 @@ def compare_unique(df1, df2, column):
 class Fix_DQ(BaseEstimator, TransformerMixin):
     # Initialize the class with optional parameters for the quantile, cat_fill_value and num_fill_value
     def __init__(self, quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
-                 rare_threshold=0.05, correlation_threshold=0.8):
+                 rare_threshold=0.01, correlation_threshold=0.8):
         self.quantile = quantile # Define a threshold for IQR for outlier detection 
         self.cat_fill_value = cat_fill_value ## Define a fill value for missing categories
         self.num_fill_value = num_fill_value # Define a fill value for missing numbers
@@ -625,8 +625,8 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
                 # Cap the outliers using the upper bound
                 X[col] = np.where(X[col] > self.upper_bounds_[col], self.upper_bounds_[col], X[col])
             else:
-                # Just print a message and don't cap the outliers in that column
-                print(f"No cap value found for column {col}. Continue...")                
+                # Just continue and don't cap the outliers in that column
+                continue
         
         # Return the DataFrame with capped outliers
         return X
@@ -650,34 +650,35 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         
-        # Impute the missing values in categorical columns with the cat_fill_value
         # Loop through the columns of cat_cols
-        for col in cat_cols:
-            # Check if the column is in the fill_values dictionary
-            if isinstance(self.cat_fill_value, dict):
-                if col in self.cat_fill_value:
-                    # Impute the missing values in the column with the corresponding fill value
-                    X[col] = X[[col]].fillna(self.cat_fill_value[col]).values
+        for col in self.missing_cols_:
+            if col in cat_cols:
+                # Check if the column is in the fill_values dictionary
+                if isinstance(self.cat_fill_value, dict):
+                    if col in self.cat_fill_value:
+                        # Impute the missing values in the column with the corresponding fill value
+                        X[col] = X[[col]].fillna(self.cat_fill_value[col]).values
+                    else:
+                        ### use a default value for that column since it is not specified
+                        X[col] = X[[col]].fillna("missing").values
                 else:
-                    ### use a default value for that column since it is not specified
-                    X[col] = X[[col]].fillna("missing").values
-            else:
-                ### use a global default value for all columns
-                X[col] = X[[col]].fillna(self.cat_fill_value).values
+                    ### use a global default value for all columns
+                    X[col] = X[[col]].fillna(self.cat_fill_value).values
         
         # Impute the missing values in numerical columns with the num_fill_value
         # Loop through the columns of num_cols
-        for col in num_cols:
-            # Check if the column is in the fill_values dictionary
-            if isinstance(self.num_fill_value, dict):
-                if col in self.num_fill_value:
-                    # Impute the missing values in the column with the corresponding fill value
-                    X[col] = X[[col]].fillna(self.num_fill_value[col]).values
+        for col in self.missing_cols_:
+            if col in num_cols:
+                # Check if the column is in the fill_values dictionary
+                if isinstance(self.num_fill_value, dict):
+                    if col in self.num_fill_value:
+                        # Impute the missing values in the column with the corresponding fill value
+                        X[col] = X[[col]].fillna(self.num_fill_value[col]).values
+                    else:
+                        ### use a default value for that column since it is not specified
+                        X[col] = X[[col]].fillna(-999).values
                 else:
-                    ### use a default value for that column since it is not specified
-                    X[col] = X[[col]].fillna(-999).values
-            else:
-                X[col] = X[[col]].fillna(self.num_fill_value).values
+                    X[col] = X[[col]].fillna(self.num_fill_value).values
         
         # Return the DataFrame with imputed missing values
         return X
@@ -803,8 +804,10 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
     
     # Define the fit method that calculates the upper bound for each numerical column
     def fit(self, X, y=None):
-        # Check if X is a pandas DataFrame
-        
+        self.drop_cols_ = []
+        self.missing_cols_ = []
+
+        # Check if X is a pandas DataFrame        
         if not isinstance(X, pd.DataFrame):
             # Convert X to a pandas DataFrame
             X = pd.DataFrame(X)
@@ -814,18 +817,22 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         float_cols = X.select_dtypes(include=["float"]).columns.tolist()
         non_float_cols = left_subtract(X.columns, float_cols)
 
+        # Impute the missing values in categorical columns with the cat_fill_value
+        missing_values = X.isnull().sum()
+        self.missing_cols_ = missing_values[missing_values > 0].index.tolist()
+
         ### First and foremost you must drop duplicate columns and rows
         X = self.detect_duplicates(X)
 
         # Detect ID columns
         self.id_cols_ = [column for column in non_float_cols if X[column].nunique() == X.shape[0]]
         if len(self.id_cols_) > 0:
-            print(f"{len(self.id_cols_)} ID cols will be dropped from further processing: {self.id_cols_}")
+            print(f"    Dropping {len(self.id_cols_)} ID column(s): {self.id_cols_}")
 
         # Detect zero-variance columns
         self.zero_var_cols_ = [column for column in non_float_cols if X[column].nunique() == 1]
         if len(self.zero_var_cols_) > 0:
-            print(f"    {len(self.zero_var_cols_)} zero-variance cols will be dropped from further processing: {self.zero_var_cols_}")
+            print(f"    Dropping {len(self.zero_var_cols_)} zero-variance cols: {self.zero_var_cols_}")
         
         # Detect highly correlated features
         self.drop_corr_cols_ = []
@@ -904,8 +911,36 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Get the columns with more than one type
         self.mixed_type_cols_ = mixed_types[mixed_types > 1].index.tolist()
         if len(self.mixed_type_cols_) > 0:
-            print(f"    {len(self.mixed_type_cols_)} mixed data type cols will be dropped from further processing: {self.mixed_type_cols_}")
-                
+            extra_mixed = left_subtract(self.mixed_type_cols_, self.missing_cols_)
+            if len(extra_mixed) > 0:
+                print(f"    Dropping {len(extra_mixed)} columns due to mixed data types")
+                for each in extra_mixed:
+                    print(f"        {each} has mixed dtypes: {X[each].apply(type).unique()}")    
+
+        ### drop ID columns from further processing ##
+        if len(self.id_cols_) > 0:
+            self.drop_cols_ += self.id_cols_
+
+        ### drop Zero Variance columns from further processing ##
+        if len(self.zero_var_cols_) > 0:
+            self.drop_cols_ += self.zero_var_cols_
+
+        ### drop mixed data type columns from further processing ##
+        if len(self.mixed_type_cols_) > 0:
+            drop_cols = left_subtract(extra_mixed, self.zero_var_cols_+self.id_cols_)
+            if len(drop_cols) > 0:
+                self.drop_cols_ += drop_cols
+            if len(extra_mixed) > 0:
+                self.drop_cols_ += extra_mixed
+            
+        ### drop highly correlated columns from further processing ##
+        if len(self.drop_corr_cols_) > 0:
+            if len(left_subtract(self.drop_corr_cols_, self.drop_cols_)) > 0:
+                extra_cols = left_subtract(self.drop_corr_cols_,self.drop_cols_)
+                self.drop_cols_ += extra_cols
+
+        self.drop_cols_ = list(set(self.drop_cols_))
+
         # Return the fitted transformer object
         return self
     
@@ -919,35 +954,10 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # First find duplicate columns and rows
         X = self.drop_duplicated(X)
 
-        
-        ### drop mixed data type columns from further processing ##
-        if len(self.id_cols_) > 0:
-            X = X.drop(self.id_cols_, axis=1)
+        if len(self.drop_cols_) > 0:
+            X = X.drop(self.drop_cols_, axis=1)
+            print(f'Dropped {len(self.drop_cols_)} columns total in dataset')
 
-        ### drop mixed data type columns from further processing ##
-        if len(self.zero_var_cols_) > 0:
-            X = X.drop(self.zero_var_cols_, axis=1)
-
-        ### drop mixed data type columns from further processing ##
-        if len(self.mixed_type_cols_) > 0:
-            drop_cols = left_subtract(self.mixed_type_cols_, self.zero_var_cols_+self.id_cols_)
-            if len(drop_cols) > 0:
-                X = X.drop(drop_cols, axis=1)
-            else:
-                drop_cols = left_subtract(self.zero_var_cols_+self.id_cols_, self.mixed_type_cols_)
-                if len(drop_cols) > 0:
-                    X = X.drop(drop_cols, axis=1)
-            
-        ### drop highly correlated columns from further processing ##
-        if len(self.drop_corr_cols_) > 0:
-            if len(left_subtract(self.drop_corr_cols_,self.mixed_type_cols_)) > 0:
-                extra_cols = left_subtract(self.drop_corr_cols_,self.mixed_type_cols_)
-            elif len(left_subtract(self.mixed_type_cols_,drop_corr_cols_)) > 0:
-                extra_cols = left_subtract(self.mixed_type_cols_, self.drop_corr_cols_)
-            if len(extra_cols) > 0:
-                X = X.drop(extra_cols, axis=1)
-            
-        
         # Call the impute_missing function first and assign it to a new variable 
         imputed_X = self.impute_missing(X)
 
@@ -1074,6 +1084,7 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
             # Display the dataframe using IPython.display
             display(self.error_df_)
         else:
+            self.error_df_ = pd.DataFrame()
             print("**No Data Schema Errors**")
 
         return self
@@ -1199,19 +1210,25 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         
         # Get the percentage of unique values in each dataframe
         unique_train = dqr_tr.loc[col, "Unique Values%"]
-        count_unique_train = len(train)*(unique_train / 100)
+        if dqr_tr.loc[col, "Unique Values%"]=='NA':
+            count_unique_train = 0
+        else:
+            count_unique_train = len(train)*(unique_train / 100)
         unique_test = dqr_te.loc[col, "Unique Values%"]
-        count_unique_test = len(test)*(unique_test / 100)
+        if dqr_te.loc[col, "Unique Values%"]=='NA':
+            count_unique_test = 0
+        else:
+            count_unique_test = len(test)*(unique_test / 100)
         
         # Initialize an empty string to store the distribution difference comments for the current column
         dist_diff_col = ""
         
         # If the column is numeric and has low cardinality, get the minimum and maximum values from the report dataframe
-        if np.issubdtype(dtype_train, np.number) and np.issubdtype(dtype_test, np.number) and unique_train < 10 and unique_test < 10:
-            min_train = report.loc[ col, "Minimum Value_Train"].values[0]
-            min_test = report.loc[ col, "Minimum Value_Test"].values[0]
-            max_train = report.loc[ col, "Maximum Value_Train"].values[0]
-            max_test = report.loc[ col, "Maximum Value_Test"].values[0]
+        if np.issubdtype(dtype_train, np.number) and np.issubdtype(dtype_test, np.number) and count_unique_train < 10 and count_unique_test < 10:
+            min_train = report.loc[ col, "Minimum Value_Train"]
+            min_test = report.loc[ col, "Minimum Value_Test"]
+            max_train = report.loc[ col, "Maximum Value_Train"]
+            max_test = report.loc[ col, "Maximum Value_Test"]
             
             # If the column is not missing in both dataframes, compute the Kolmogorov-Smirnov test statistic to measure the distribution difference
             if missing_train < 100 and missing_test < 100:
@@ -1227,7 +1244,10 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
 
         # If the percentage of unique values are different between the two dataframes, add a comment to indicate that there is a unique value difference
         if unique_train != unique_test:
-            dist_diff_col += f"The percentage of unique values of {col} are different between train ({unique_train:.2f}%) and test ({unique_test:.2f}%). "
+            if unique_train=='NA' or unique_test == 'NA':
+                dist_diff_col += f"The data types of {col} are different between train: {train[col].dtype} and test: {test[col].dtype}. "
+            else:
+                dist_diff_col += f"The percentage of unique values of {col} are different between train ({unique_train:.2f}%) and test ({unique_test:.2f}%). "
         
         # If the distribution difference comments are empty, set it to None
         if dist_diff_col == "":
@@ -1261,7 +1281,7 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.23'
+version_number =  '1.24'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
