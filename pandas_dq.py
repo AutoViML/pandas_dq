@@ -598,8 +598,8 @@ def compare_unique(df1, df2, column):
 # Define a custom transformer class for fixing data quality issues
 class Fix_DQ(BaseEstimator, TransformerMixin):
     # Initialize the class with optional parameters for the quantile, cat_fill_value and num_fill_value
-    def __init__(self, quantile=0.75, cat_fill_value="missing", num_fill_value=9999, 
-                 rare_threshold=0.01, correlation_threshold=0.8):
+    def __init__(self, quantile=0.87, cat_fill_value="missing", num_fill_value=9999, 
+                 rare_threshold=0.01, correlation_threshold=0.9):
         self.quantile = quantile # Define a threshold for IQR for outlier detection 
         self.cat_fill_value = cat_fill_value ## Define a fill value for missing categories
         self.num_fill_value = num_fill_value # Define a fill value for missing numbers
@@ -852,7 +852,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         #### processing of quantiles is only for float columns or those in dict ###
         if self.quantile is None:
             ### you still need to calculate upper bounds needed capping for infinite values ##
-            base_quantile = 0.75
+            base_quantile = 0.99
             for col in float_cols:
                 # Get the third quartile
                 q3 = X[col].quantile(base_quantile)
