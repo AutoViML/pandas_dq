@@ -65,10 +65,6 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     Finally, the function identifies if the problem is a classification problem or
      a regression problem and checks if there is class imbalanced or target leakage in the dataset.
     """
-    NEW_COLUMN_WIDTH = 500
-    # change the maximum column width in pandas
-    pd.set_option('display.max_colwidth', NEW_COLUMN_WIDTH)
-
     if not verbose:
         print("This is a summary report. Change verbose to 1 to see more details on each DQ issue.")
     #### If sometimes, target is given as empty string, change it to None
@@ -81,7 +77,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
         ext = os.path.splitext(data)[-1]
         # Load the file into a pandas dataframe based on the extension
         if ext == ".csv":
-            print("If large dataset, we will randomly sample 100K rows to speed up processing...")
+            print("    If large dataset, we will randomly sample 100K rows to speed up processing...")
             if csv_engine == 'pandas':
                 # Upload the data file into Pandas
                 df = pd.read_csv(data)
@@ -96,37 +92,37 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
             else :
                 # print the pandas version
                 if str(pd.__version__)[0] == '2':
-                    print(f"pandas version={pd.__version__}. Hence using pyarrow backend.")
+                    print(f"    pandas version={pd.__version__}. Hence using pyarrow backend.")
                     df = pd.read_csv(data, engine='pyarrow', dtype_backend='pyarrow')
                 else:
-                    print(f"pandas version={pd.__version__}. Hence using pandas backend.")
+                    print(f"    pandas version={pd.__version__}. Hence using pandas backend.")
                     df = pd.read_csv(data)
         elif ext == ".parquet":
             df = pd.read_parquet(data)
         elif ext in [".feather", ".arrow", "ftr"]:
             df = pd.read_feather(data)
         else:
-            print("Unsupported file format. Please use CSV, parquet, feather or arrow.")
+            print("    Unsupported file format. Please use CSV, parquet, feather or arrow.")
             return data
         ######## This is to sample the data if it is too large ###
         if df.shape[0] >= 1000000:
             df = df.sample(100000)
     elif isinstance(data, pd.DataFrame):
-        df = data
+        df = copy.deepcopy(data)
     else:
-        print("Invalid input. Please provide a string (filename) or a dataframe.")
-        return
+        print("    Unrecognized input. Please provide a filename or a pandas dataframe. Returning...")
+        return data
 
     # Drop duplicate rows
     dup_rows = df.duplicated().sum()
     if dup_rows > 0:
-        print(f'Alert: Dropping {dup_rows} duplicate rows can sometimes cause column data types to change to object. Double-check!')
+        print(f'    Alert: Dropping {dup_rows} duplicate rows can sometimes cause column data types to change to object. Double-check!')
         df = df.drop_duplicates()
     
     # Drop duplicate columns
     dup_cols = df.columns[df.columns.duplicated()]
     if len(dup_cols) > 0:
-        print(f'Alert: Dropping {len(dup_cols)} duplicate cols which can cause column data types to change to object. Double-check!')
+        print(f'    Alert: Dropping {len(dup_cols)} duplicate cols')
         ### DO NOT MODIFY THIS LINE. TOOK A LONG TIME TO MAKE IT WORK!!!
         ###  THis is the only way that dropping duplicate columns works. This is not found anywhere!
         df = df.T[df.T.index.duplicated(keep='first')].T
@@ -552,7 +548,53 @@ def left_subtract(l1,l2):
             lst.append(i)
     return lst
 ################################################################################
+def compare_unique(df1, df2, column):
+    """
+    Compare the difference between the unique values in a single column of two dataframes.
 
+    This function takes two dataframes and a column name as inputs and returns a dictionary
+    with the count and the actual differences of the unique values in that column between
+    the two dataframes.
+
+    Parameters
+    ----------
+    df1 : pandas.DataFrame
+        The first dataframe to compare.
+    df2 : pandas.DataFrame
+        The second dataframe to compare.
+    column : str
+        The name of the column to compare.
+
+    Returns
+    -------
+    result : dict
+        A dictionary with four keys: 'count_1', 'count_2', 'diff_1_2', and 'diff_2_1'.
+        'count_1' is the number of unique values in column of df1.
+        'count_2' is the number of unique values in column of df2.
+        'diff_1_2' is a list of unique values in column of df1 that are not in column of df2.
+        'diff_2_1' is a list of unique values in column of df2 that are not in column of df1.
+    """
+    # Get the unique values in column of each dataframe as sets
+    set1 = set(df1[column].unique())
+    set2 = set(df2[column].unique())
+    
+    # Calculate the count and the differences using set operations
+    count_1 = len(set1)
+    count_2 = len(set2)
+    diff_1_2 = list(set1 - set2)
+    diff_2_1 = list(set2 - set1)
+    
+    # Store the results in a dictionary
+    result = {
+        "unique_count_in_df1": count_1,
+        "unique_count_in_df2": count_2,
+        "diff_between_df1_df2": diff_1_2,
+        "diff_between_df2_df1": diff_2_1,
+    }
+    
+    # Return the result
+    return result
+########################################################################################
 # Define a custom transformer class for fixing data quality issues
 class Fix_DQ(BaseEstimator, TransformerMixin):
     # Initialize the class with optional parameters for the quantile, cat_fill_value and num_fill_value
@@ -1071,7 +1113,8 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
     This is a data comparison tool that accepts two pandas dataframes as input and 
     returns a report highlighting any differences between them. You can exclude
     certain columns from this comparison (such as target column) by using
-    the "exclude" argument.
+    the "exclude" argument. You can also compare the unique values between two
+    dataframes using the compare_uniques argument. 
     
     Parameters
     ----------
@@ -1085,6 +1128,9 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
     exclude : []
         You can exclude an columns from comparison such as target column which is in train
         but not in test so that the comparison can be 1:1 between the dataframes.
+    compare_uniques : []
+        If you give column names here, it will compare the number of unique values in those
+        columns between the two dataframes. Useful for train test comparisons.
     verbose : 0 or 1
         If 1, Provides a longer report detailing all the columns mentioned in the report output below.
         If 0, Provides only a shorter report with Column Name, DQ Issue Train, DQ Issue Test and Distribution Difference.
@@ -1128,15 +1174,15 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
     if not train.columns.equals(test.columns):
         print("The two dataframes dont have the same columns. Use exclude argument to exclude columns from comparison.")
         return pd.DataFrame()
+    else:
+        print('Analyzing two dataframes for differences. This will take time, please be patient...')
     
     # Use your function dqr = dq_report(df) to generate a data quality report for each dataframe
-    dqr_train = dq_report(train, verbose=-1)
-    dqr_train = dqr_train.reset_index().rename(columns={'index':"Column Name"})
-    dqr_test = dq_report(test,verbose = -1)
-    dqr_test = dqr_test.reset_index().rename(columns={'index':"Column Name"})
+    dqr_tr = dq_report(train, verbose=-1)
+    dqr_te = dq_report(test,verbose = -1)
     
     # Merge the two reports on the column name
-    report = pd.merge(dqr_train, dqr_test, on="Column Name", suffixes=("_Train", "_Test"))
+    report = dqr_tr.join(dqr_te, lsuffix="_Train", rsuffix="_Test")
     
     # Initialize an empty list to store the distribution difference results
     dist_diff = []
@@ -1148,22 +1194,24 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         dtype_test = test[col].dtype
         
         # Get the percentage of missing values in each dataframe
-        missing_train = train[col].isna().mean() * 100
-        missing_test = test[col].isna().mean() * 100
+        missing_train = dqr_tr.loc[col, "Missing Values%"]
+        missing_test = dqr_te.loc[col, "Missing Values%"]
         
         # Get the percentage of unique values in each dataframe
-        unique_train = train[col].nunique() / len(train) * 100
-        unique_test = test[col].nunique() / len(test) * 100
+        unique_train = dqr_tr.loc[col, "Unique Values%"]
+        count_unique_train = len(train)*(unique_train / 100)
+        unique_test = dqr_te.loc[col, "Unique Values%"]
+        count_unique_test = len(test)*(unique_test / 100)
         
         # Initialize an empty string to store the distribution difference comments for the current column
         dist_diff_col = ""
         
         # If the column is numeric and has low cardinality, get the minimum and maximum values from the report dataframe
         if np.issubdtype(dtype_train, np.number) and np.issubdtype(dtype_test, np.number) and unique_train < 10 and unique_test < 10:
-            min_train = report.loc[report["Column Name"] == col, "Minimum Value_Train"].values[0]
-            min_test = report.loc[report["Column Name"] == col, "Minimum Value_Test"].values[0]
-            max_train = report.loc[report["Column Name"] == col, "Maximum Value_Train"].values[0]
-            max_test = report.loc[report["Column Name"] == col, "Maximum Value_Test"].values[0]
+            min_train = report.loc[ col, "Minimum Value_Train"].values[0]
+            min_test = report.loc[ col, "Minimum Value_Test"].values[0]
+            max_train = report.loc[ col, "Maximum Value_Train"].values[0]
+            max_test = report.loc[ col, "Maximum Value_Test"].values[0]
             
             # If the column is not missing in both dataframes, compute the Kolmogorov-Smirnov test statistic to measure the distribution difference
             if missing_train < 100 and missing_test < 100:
@@ -1190,6 +1238,7 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
     
     # Add a new column to the report dataframe with the distribution difference results
     report["Distribution Difference"] = dist_diff
+    report = report.reset_index().rename(columns={'index':"Column Name"})
 
     if verbose:
         if html:
@@ -1212,7 +1261,7 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.22'
+version_number =  '1.23'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
