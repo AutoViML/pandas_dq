@@ -650,6 +650,13 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         # Get the numerical columns
         num_cols = X.select_dtypes(include=["int", "float"]).columns.tolist()
         
+        missing_values = X.isnull().sum()
+        missing_cols = missing_values[missing_values > 0].index.tolist()
+        #### Sometimes missing values are found in test but not train. This to catch those!
+        for col in missing_cols:
+            if not col in self.missing_cols_:
+                self.missing_cols_.append(col)
+
         # Loop through the columns of cat_cols
         for col in self.missing_cols_:
             if col in cat_cols:
@@ -817,9 +824,15 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         float_cols = X.select_dtypes(include=["float"]).columns.tolist()
         non_float_cols = left_subtract(X.columns, float_cols)
 
-        # Impute the missing values in categorical columns with the cat_fill_value
+        # Find percent of missing values in all columns
         missing_values = X.isnull().sum()
         self.missing_cols_ = missing_values[missing_values > 0].index.tolist()
+        drop_missing = []
+        for each in self.missing_cols_:
+            if X[each].isna().sum()/len(X) >= 0.80 :
+                ### drop the column if it has 80% or more missing values
+                drop_missing.append(each)
+                print(f"    Dropping {each} since it has >= 80%% missing values")
 
         ### First and foremost you must drop duplicate columns and rows
         X = self.detect_duplicates(X)
@@ -939,6 +952,10 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
                 extra_cols = left_subtract(self.drop_corr_cols_,self.drop_cols_)
                 self.drop_cols_ += extra_cols
 
+        ### drop columns having more than 80% missing values
+        if len(drop_missing) > 0:
+            self.drop_cols_ += drop_missing
+
         self.drop_cols_ = list(set(self.drop_cols_))
 
         # Return the fitted transformer object
@@ -1035,36 +1052,52 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
             raise ValueError("The number of columns in the dataframe does not match the number of columns in the schema")
 
         # Translate the schema to pandas dtypes
-        translated_schema = {}
+        self.translated_schema = {}
         for column, dtype in self.schema.items():
             if dtype in ["string","object","category", "str"]:
-                translated_schema[column] = "object"
+                self.translated_schema[column] = "object"
             elif dtype in ["text","NLP","nlp"]:
-                translated_schema[column] = "object"
+                self.translated_schema[column] = "object"
             elif dtype in ["boolean","bool"]:
-                translated_schema[column] = "bool"
+                self.translated_schema[column] = "bool"
             elif dtype in [ "np.int8", "int8"]:
-                translated_schema[column] = "int8"
+                self.translated_schema[column] = "int8"
             elif dtype in ["np.int16","int16"]:
-                translated_schema[column] = "int16"
+                self.translated_schema[column] = "int16"
             elif dtype in ["int32", "np.int32"]:
-                translated_schema[column] = "int32"
+                self.translated_schema[column] = "int32"
             elif dtype in ["integer","int", "int64", "np.int64"]:
-                translated_schema[column] = "int64"
+                self.translated_schema[column] = "int64"
             elif dtype in ["date"]:
-                translated_schema[column] = "datetime64[ns]"                
+                self.translated_schema[column] = "datetime64[ns]"                
             elif dtype in ["float"]:
-                translated_schema[column] = "float64"
+                self.translated_schema[column] = "float64"
             elif dtype in ["np.float32", "float32"]: 
-                translated_schema[column] = "float32"
+                self.translated_schema[column] = "float32"
             elif dtype in ["np.float64", "float64"]:
-                translated_schema[column] = "float64"
+                self.translated_schema[column] = "float64"
             else:
                 raise ValueError("Invalid data type: {}".format(dtype))
 
+        return self
+            
+    def transform(self, df):
+        """
+        Transforms the dataframe dtype to the expected dtype if the dataframe has been fit with DataSchemaChecker
+
+        Args:
+            df (pd.DataFrame): The dataframe to be transformed using DataSchemaChecker's error_df_ variable.
+
+        Raises:
+            Error: If the datatype for a column cannot be transformed as requested.
+
+        Returns:
+            modified dataframe (df)
+        """        
+        df = copy.deepcopy(df)
         # Check if the data types of the columns in the dataframe match the data types in the schema
         errors = []
-        for column, dtype in translated_schema.items():
+        for column, dtype in self.translated_schema.items():
             # Get the actual data type of the column
             actual_dtype = df[column].dtype
             # Compare with the expected data type
@@ -1087,22 +1120,6 @@ class DataSchemaChecker(BaseEstimator, TransformerMixin):
             self.error_df_ = pd.DataFrame()
             print("**No Data Schema Errors**")
 
-        return self
-            
-    def transform(self, df):
-        """
-        Transforms the dataframe dtype to the expected dtype if the dataframe has been fit with DataSchemaChecker
-
-        Args:
-            df (pd.DataFrame): The dataframe to be transformed using DataSchemaChecker's error_df_ variable.
-
-        Raises:
-            Error: If the datatype for a column cannot be transformed as requested.
-
-        Returns:
-            modified dataframe (df)
-        """        
-        df = copy.deepcopy(df)
         if len(self.error_df_) > 0:
             # Loop over only the error data types detected in the Error DataFrame.
             for i, row in self.error_df_.iterrows():
@@ -1281,7 +1298,7 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.24'
+version_number =  '1.25'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
