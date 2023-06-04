@@ -176,16 +176,20 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
     minimum_values = pd.DataFrame(
         columns=['Minimum Value']
     )
-    for row in list(df.columns.values):
-        if row not in missing_cols:
-            maximum_values.loc[row] = [df[row].max()]
-        elif row in number_cols:
-            maximum_values.loc[row] = [df[row].max()]
-    for row in list(df.columns.values):
-        if row not in missing_cols:
-            minimum_values.loc[row] = [df[row].min()]
-        elif row in number_cols:
-            minimum_values.loc[row] = [df[row].min()]
+
+    for col in list(df.columns.values):
+        if col not in missing_cols:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                maximum_values.loc[col] = [df[col].max()]
+        elif col in number_cols:
+            maximum_values.loc[col] = [df[col].max()]
+
+    for col in list(df.columns.values):
+        if col not in missing_cols:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                minimum_values.loc[col] = [df[col].min()]
+        elif col in number_cols:
+            minimum_values.loc[col] = [df[col].min()]
 
     ### now generate the data quality starter dataframe
     dq_df2 = data_types.join(missing_data).join(unique_values).join(minimum_values).join(maximum_values)
@@ -344,7 +348,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
                     dq_df1.loc[bad_col,'first_comma'] = ', '
                     first_time =False
                 ### check if there are outlier columns and print them ##
-                new_string = f"has {len(outliers)} outliers greater than upper bound ({upper_bound}) or lower than lower bound({lower_bound}). Cap them or remove them."
+                new_string = f"has {len(outliers)} outliers greater than upper bound ({upper_bound:.2f}) or lower than lower bound({lower_bound:.2f}). Cap them or remove them."
                 dq_df2.loc[col,new_col] += dq_df2.loc[col,'first_comma'] + new_string
                 dq_df2.loc[col,'first_comma'] = ', '
         if len(outlier_cols) < 1:
@@ -371,7 +375,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
 
     # Detect highly correlated features
     correlation_threshold = 0.8 # Define a threshold for high correlation
-    correlation_matrix = df.corr().abs() # Get the absolute correlation matrix of numerical columns
+    correlation_matrix = df[num_cols].corr().abs() # Get the absolute correlation matrix of numerical columns
     upper_triangle = correlation_matrix.where(np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)) # Get the upper triangle of the matrix
     high_corr_cols = [column for column in upper_triangle.columns if any(upper_triangle[column] > correlation_threshold)] # Get the columns with high correlation
     if len(high_corr_cols) > 0:
@@ -849,7 +853,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
         
         # Detect highly correlated features
         self.drop_corr_cols_ = []
-        correlation_matrix = X.corr().abs() # Get the absolute correlation matrix of numerical columns
+        correlation_matrix = X[num_cols].corr().abs() # Get the absolute correlation matrix of numerical columns
         upper_triangle = correlation_matrix.where(np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)) # Get the upper triangle of the matrix
         high_corr_cols = [column for column in upper_triangle.columns if any(upper_triangle[column] > self.correlation_threshold)] # Get the columns with high correlation
         if len(high_corr_cols) > 0:
@@ -1298,7 +1302,7 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.25'
+version_number =  '1.27'
 print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
 """)
 #################################################################################
