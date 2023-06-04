@@ -1302,7 +1302,6 @@ def dc_report(train, test, exclude=[], html=False, verbose=0):
         return short_report
 ############################################################################################
 module_type = 'Running' if  __name__ == "__main__" else 'Imported'
-version_number =  '1.27'
-print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.
-""")
+version_number =  '1.28'
+#print(f"""{module_type} pandas_dq ({version_number}). Always upgrade to get latest features.""")
 #################################################################################
