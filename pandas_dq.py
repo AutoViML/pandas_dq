@@ -354,7 +354,7 @@ def dq_report(data, target=None, html=False, csv_engine="pandas", verbose=0):
         dq_df1.loc[good_col,'first_comma'] = ', '
 
     # Detect mixed data types and suggests to convert them to a single type or split them into multiple columns123
-    mixed_types = df[preds].applymap(type).nunique() # Get the number of unique types in each column
+    mixed_types = df[preds].map(type).nunique() # Get the number of unique types in each column
     mixed_cols = mixed_types[mixed_types > 1].index.tolist() # Get the columns with more than one type
     if len(mixed_cols) > 0:
         new_string = f"There are {len(mixed_cols)} columns with mixed data types in the dataset. Convert them to a single type or split them into multiple columns."
@@ -980,7 +980,7 @@ class Fix_DQ(BaseEstimator, TransformerMixin):
 
         # Get the number of unique types in each column
         self.mixed_type_cols_ = []
-        mixed_types = X.applymap(type).nunique()
+        mixed_types = X.map(type).nunique()
         # Get the columns with more than one type
         self.mixed_type_cols_ = mixed_types[mixed_types > 1].index.tolist()
         if len(self.mixed_type_cols_) > 0:
